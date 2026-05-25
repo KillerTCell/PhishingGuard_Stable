@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import math
 from enum import Enum
-from typing import Generic, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -181,6 +181,30 @@ class AssistantRole(str, Enum):
 
 
 # ---------------------------------------------------------------------------
+# Error response envelope
+# ---------------------------------------------------------------------------
+
+
+class ErrorResponse(BaseModel):
+    """Standard JSON error body returned on 4xx/5xx responses.
+
+    Registered as a response model on all routes so OpenAPI documents the
+    shape.  FastAPI exception handlers populate this via JSONResponse.
+
+    Attributes:
+        code:    Machine-readable error code, e.g. ``VALIDATION_ERROR``,
+                 ``NOT_FOUND``, ``RATE_LIMIT_EXCEEDED``.
+        message: Human-readable description suitable for display.
+        details: Optional structured payload — field-level validation errors
+                 from Pydantic, or additional context from the handler.
+    """
+
+    code: str
+    message: str
+    details: Optional[Any] = None
+
+
+# ---------------------------------------------------------------------------
 # Generic paginated response
 # ---------------------------------------------------------------------------
 
@@ -205,3 +229,7 @@ class Page(BaseModel, Generic[T]):
         """Convenience constructor — computes ``pages`` from total + page_size."""
         pages = max(1, math.ceil(total / page_size)) if page_size > 0 else 1
         return cls(items=items, total=total, page=page, pages=pages)
+
+
+# Alias so callers may use either name interchangeably.
+PaginatedResponse = Page
