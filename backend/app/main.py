@@ -167,7 +167,7 @@ def create_app() -> FastAPI:
         /api/v1/health        routers/health.py     Section 4.13
     """
     app = FastAPI(
-        title="PhishGuard",
+        title="PhishGuard API",
         description="Advanced Phishing Detection System — REST API",
         version="1.0.0",
         docs_url="/api/docs",

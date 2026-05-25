@@ -283,13 +283,14 @@ async def create_export(
 
 @router.get(
     "/settings/export/{job_id}",
+    response_model=None,   # returns FileResponse or ExportJobStatusResponse; not Pydantic-serialisable
     summary="Download export file or poll job status (admin only)",
 )
 async def get_export(
     job_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
-) -> ExportJobStatusResponse | FileResponse:
+):
     """Return export file (FileResponse) when ready, or job status while pending.
 
     A-02 fix: FileResponse served directly from /mnt/exports volume mount.

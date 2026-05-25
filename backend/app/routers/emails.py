@@ -318,6 +318,7 @@ async def get_email(
 @router.delete(
     "/emails/{email_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Hard delete email and all child records (admin only)",
 )
 async def delete_email(

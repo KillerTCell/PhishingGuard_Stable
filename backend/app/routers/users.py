@@ -248,6 +248,7 @@ async def update_user(
 @router.delete(
     "/users/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Soft-deactivate a user (admin only)",
 )
 async def deactivate_user(

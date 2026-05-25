@@ -33,12 +33,17 @@ slowapi==0.1.9
 
 # Email Processing
 bleach==6.1.0
-checkdmarc==1.5.7
-mailparser==1.0.35
+checkdmarc==1.5.4    # plan says 1.5.7 but that version was never published to PyPI; 1.5.4 is nearest
+mail-parser==3.15.0  # plan says mailparser==1.0.35; correct PyPI name is mail-parser; 3.15.0 is latest stable
 tldextract==5.1.2
 resend==2.0.0
 
 # NLP & Machine Learning
+# spacy 3.7.4 requires typer<0.10.0 which conflicts with fastapi-cli's typer>=0.12.3.
+# Install spacy separately with --no-deps (typer is only used by spacy's CLI, not
+# its Python API which is all PhishGuard uses):
+#   pip install spacy==3.7.4 --no-deps
+#   pip install spacy==3.7.4 --no-deps --extra-index-url ... (in Docker)
 spacy==3.7.4
 # en-core-web-sm: install separately → python -m spacy download en_core_web_sm
 scikit-learn==1.5.0

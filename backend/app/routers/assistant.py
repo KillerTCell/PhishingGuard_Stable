@@ -3,9 +3,14 @@
 POST /analysis/assistant   -- Claude API streaming or LOCAL_ANSWER_MAP fallback
 
 Rate limit: 30 req/min per user (Section 7.4).
-"""
-from __future__ import annotations
 
+Note: from __future__ import annotations is intentionally omitted here.
+slowapi's @limiter.limit uses functools.wraps, which copies __annotations__ but
+NOT __globals__.  With PEP-563 deferred annotations, string annotations like
+'AssistantRequest' are evaluated in the wrapper's globals (slowapi's module),
+not this module's globals, causing NameError.  Python 3.12 resolves all types
+used here without deferred evaluation.
+"""
 import json
 from typing import Any
 
@@ -122,7 +127,7 @@ async def assistant_chat(
     body: AssistantRequest,
     current_user: CurrentUser = Depends(get_current_user),
     thresholds: OrgThresholds = Depends(get_org_thresholds),
-) -> StreamingResponse:
+):
     """Stream an AI assistant response (Claude API or local fallback).
 
     local_mode=True forces LOCAL_ANSWER_MAP lookup (used for demos or when

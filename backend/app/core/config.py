@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str
     """Celery broker DSN (typically same Redis instance as REDIS_URL)."""
 
+    CELERY_RESULT_BACKEND: str = ""
+    """Celery result backend DSN (separate Redis DB index from the broker)."""
+
     # ── Security ────────────────────────────────────────────────────────────
     JWT_SECRET: str = Field(min_length=32)
     """HS256 signing secret — minimum 32 characters (NFR-2).
@@ -54,6 +57,9 @@ class Settings(BaseSettings):
     """Resend transactional email API key — FR-06 digest delivery."""
 
     # ── Application ─────────────────────────────────────────────────────────
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
+    """Comma-separated list of allowed CORS origins (used by CORSMiddleware)."""
+
     MODEL_VERSION: str = "rf_v1.0.0"
     """ML model version tag — must match the artefact in ml/model.pkl."""
 
