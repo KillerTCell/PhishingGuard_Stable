@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>All Analysed Emails - PhishGuard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+/* Custom Select Arrow */
+select.custom-select {
+appearance: none;
+background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+background-repeat: no-repeat;
+background-position: right 0.75rem center;
+background-size: 1em;
+}
+</style></head>
+<body class="bg-gray-50 font-sans text-gray-900 antialiased flex h-screen overflow-hidden" style="font-family: 'Inter', sans-serif;">
+
+    <!-- Sidebar (Desktop) -->
+    <aside class="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 h-full shrink-0">
+        <div class="h-16 flex items-center px-6 border-b border-gray-100">
+            <div class="flex items-center gap-2.5 text-purple-600">
+                <iconify-icon icon="solar:shield-check-linear" width="28" height="28" style="stroke-width: 1.5;"></iconify-icon>
+                <span class="font-semibold text-lg tracking-tight text-gray-900">PhishGuard <span class="text-gray-500 font-medium">Lite</span></span>
+            </div>
+        </div>
+        <nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+            <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors">
+                <iconify-icon icon="solar:pie-chart-2-linear" width="20" height="20" style="stroke-width: 1.5;"></iconify-icon>
+                Dashboard
+            </a>
+            <a href="all-emails" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg bg-purple-50 text-purple-700 transition-colors">
+                <iconify-icon icon="solar:letter-linear" width="20" height="20" style="stroke-width: 1.5;"></iconify-icon>
+                All Emails
+            </a>
+            <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors">
+                <iconify-icon icon="solar:shield-warning-linear" width="20" height="20" style="stroke-width: 1.5;"></iconify-icon>
+                Quarantined
+            </a>
+            <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors">
+                <iconify-icon icon="solar:document-text-linear" width="20" height="20" style="stroke-width: 1.5;"></iconify-icon>
+                Policies
+            </a>
+            <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors">
+                <iconify-icon icon="solar:settings-linear" width="20" height="20" style="stroke-width: 1.5;"></iconify-icon>
+                Settings
+            </a>
+        </nav>
+        <div class="p-4 border-t border-gray-100">
+            <div class="flex items-center gap-3 px-3 py-2">
+                <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-semibold text-xs shrink-0">
+                    AD
+                </div>
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">Admin User</p>
+                    <p class="text-xs text-gray-500 truncate">admin@phishguard.test</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+        
+        <!-- Topbar -->
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0">
+            <div class="flex items-center md:hidden gap-3">
+                <button class="text-gray-500 hover:text-gray-700 focus:outline-none">
+                    <iconify-icon icon="solar:hamburger-menu-linear" width="24" height="24" style="stroke-width: 1.5;"></iconify-icon>
+                </button>
+                <div class="flex items-center gap-2 text-purple-600">
+                    <iconify-icon icon="solar:shield-check-linear" width="24" height="24" style="stroke-width: 1.5;"></iconify-icon>
+                </div>
+            </div>
+            <div class="hidden md:block w-96 relative">
+                <iconify-icon icon="solar:magnifer-linear" width="20" height="20" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" style="stroke-width: 1.5;"></iconify-icon>
+                <input type="text" placeholder="Global search..." class="w-full bg-gray-50 border border-gray-200 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-shadow placeholder:text-gray-400">
+            </div>
+            <div class="flex items-center gap-4">
+                <button class="relative text-gray-400 hover:text-gray-600 transition-colors">
+                    <iconify-icon icon="solar:bell-linear" width="24" height="24" style="stroke-width: 1.5;"></iconify-icon>
+                    <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            
+            <!-- Page Header -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <span class="text-xs font-semibold tracking-wider text-purple-600 uppercase">Email Analysis</span>
+                    <h1 class="text-2xl font-semibold tracking-tight text-gray-900 mt-1">All Analysed Emails</h1>
+                    <p class="text-sm text-gray-500 mt-1">Review each email classification, risk score, and quarantine status.</p>
+                </div>
+                <div class="shrink-0">
+                    <a href="manual-analysis" class="inline-flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+                        Manual Upload/Check
+                        <iconify-icon icon="solar:arrow-right-linear" width="16" height="16" style="stroke-width: 1.5;"></iconify-icon>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Search and Filter Card -->
+            <div class="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-sm">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                    <!-- Search Input -->
+                    <div class="lg:col-span-2 space-y-1">
+                        <label for="search-emails" class="block text-xs font-medium text-gray-700">Search</label>
+                        <div class="relative">
+                            <iconify-icon icon="solar:magnifer-linear" width="18" height="18" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" style="stroke-width: 1.5;"></iconify-icon>
+                            <input type="text" id="search-emails" placeholder="Search by sender or subject..." class="w-full bg-white border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-shadow placeholder:text-gray-400">
+                        </div>
+                    </div>
+                    
+                    <!-- Classification Filter -->
+                    <div class="space-y-1">
+                        <label for="filter-classification" class="block text-xs font-medium text-gray-700">Classification</label>
+                        <select id="filter-classification" class="custom-select w-full bg-white border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-gray-700 transition-shadow cursor-pointer">
+                            <option>All</option>
+                            <option>Safe</option>
+                            <option>Suspicious</option>
+                            <option>Phishing</option>
+                        </select>
+                    </div>
+
+                    <!-- Status Filter -->
+                    <div class="space-y-1">
+                        <label for="filter-status" class="block text-xs font-medium text-gray-700">Status</label>
+                        <select id="filter-status" class="custom-select w-full bg-white border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-gray-700 transition-shadow cursor-pointer">
+                            <option>All</option>
+                            <option>Analysed</option>
+                            <option>Quarantined</option>
+                            <option>Released</option>
+                            <option>Needs Review</option>
+                            <option>Confirmed Phishing</option>
+                            <option>Marked Safe</option>
+                        </select>
+                    </div>
+
+                    <!-- Risk Filter -->
+                    <div class="space-y-1">
+                        <label for="filter-risk" class="block text-xs font-medium text-gray-700">Risk Level</label>
+                        <select id="filter-risk" class="custom-select w-full bg-white border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-gray-700 transition-shadow cursor-pointer">
+                            <option>All</option>
+                            <option>Low</option>
+                            <option>Medium</option>
+                            <option>High</option>
+                            <option>Critical</option>
+                        </select>
+                    </div>
+
+                    <!-- Sort Dropdown -->
+                    <div class="space-y-1">
+                        <label for="sort-emails" class="block text-xs font-medium text-gray-700">Sort by</label>
+                        <select id="sort-emails" class="custom-select w-full bg-white border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-gray-700 transition-shadow cursor-pointer">
+                            <option>Newest first</option>
+                            <option>Oldest first</option>
+                            <option>Highest risk</option>
+                            <option>Lowest risk</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emails Table Card -->
+            <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+                <div class="overflow-x-auto w-full">
+                    <table class="w-full text-left border-collapse whitespace-nowrap">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-medium">
+                                <th class="px-6 py-4">Sender</th>
+                                <th class="px-6 py-4">Subject</th>
+                                <th class="px-6 py-4">Risk Score</th>
+                                <th class="px-6 py-4">Classification</th>
+                                <th class="px-6 py-4">Status</th>
+                                <th class="px-6 py-4">Received Date</th>
+                                <th class="px-6 py-4 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 text-sm">
+                            
+                            <!-- Row 1 -->
+                            <tr class="hover:bg-gray-50/50 transition-colors group">
+                                <td class="px-6 py-4 font-medium text-gray-900">security@fake-bank-login.test</td>
+                                <td class="px-6 py-4 text-gray-500 max-w-[200px] lg:max-w-[300px] truncate">Urgent: Verify your account immediately</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                                        <span class="font-semibold text-red-600">92</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20">Phishing</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-500/20">Quarantined</span>
+                                </td>
+                                <td class="px-6 py-4 text-gray-500">Today</td>
+                                <td class="px-6 py-4 text-right">
+                                    <a href="email-detail" class="text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">View</a>
+                                </td>
+                            </tr>
+
+                            <!-- Row 2 -->
+                            <tr class="hover:bg-gray-50/50 transition-colors group">
+                                <td class="px-6 py-4 font-medium text-gray-900">alerts@delivery-update.test</td>
+                                <td class="px-6 py-4 text-gray-500 max-w-[200px] lg:max-w-[300px] truncate">Failed delivery confirmation required</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                                        <span class="font-semibold text-red-600">81</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20">Phishing</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-500/20">Quarantined</span>
+                                </td>
+                                <td class="px-6 py-4 text-gray-500">Today</td>
+                                <td class="px-6 py-4 text-right">
+                                    <a href="email-detail" class="text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">View</a>
+                                </td>
+                            </tr>
+
+                            <!-- Row 3 -->
+                            <tr class="hover:bg-gray-50/50 transition-colors group">
+                                <td class="px-6 py-4 font-medium text-gray-900">hr@payroll-alert.test</td>
+                                <td class="px-6 py-4 text-gray-500 max-w-[200px] lg:max-w-[300px] truncate">Payroll document requires approval</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                                        <span class="font-semibold text-orange-600">73</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20">Suspicious</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-500/20">Quarantined</span>
+                                </td>
+                                <td class="px-6 py-4 text-gray-500">Yesterday</td>
+                                <td class="px-6 py-4 text-right">
+                                    <a href="email-detail" class="text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">View</a>
+                                </td>
+                            </tr>
+
+                            <!-- Row 4 -->
+                            <tr class="hover:bg-gray-50/50 transition-colors group">
+                                <td class="px-6 py-4 font-medium text-gray-900">billing@cloud-billing-demo.test</td>
+                                <td class="px-6 py-4 text-gray-500 max-w-[200px] lg:max-w-[300px] truncate">Cloud invoice payment failed</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                                        <span class="font-semibold text-orange-600">68</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20">Suspicious</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20">Needs Review</span>
+                                </td>
+                                <td class="px-6 py-4 text-gray-500">Yesterday</td>
+                                <td class="px-6 py-4 text-right">
+                                    <a href="email-detail" class="text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">View</a>
+                                </td>
+                            </tr>
+
+                            <!-- Row 5 -->
+                            <tr class="hover:bg-gray-50/50 transition-colors group">
+                                <td class="px-6 py-4 font-medium text-gray-900">notices@company-demo.test</td>
+                                <td class="px-6 py-4 text-gray-500 max-w-[200px] lg:max-w-[300px] truncate">Weekly team update</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                        <span class="font-semibold text-green-600">12</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20">Safe</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20">Released</span>
+                                </td>
+                                <td class="px-6 py-4 text-gray-500">2 days ago</td>
+                                <td class="px-6 py-4 text-right">
+                                    <a href="email-detail" class="text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">View</a>
+                                </td>
+                            </tr>
+
+                            <!-- Row 6 -->
+                            <tr class="hover:bg-gray-50/50 transition-colors group">
+                                <td class="px-6 py-4 font-medium text-gray-900">admin@company-demo.test</td>
+                                <td class="px-6 py-4 text-gray-500 max-w-[200px] lg:max-w-[300px] truncate">Password reset confirmation</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                        <span class="font-semibold text-green-600">24</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20">Safe</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20">Released</span>
+                                </td>
+                                <td class="px-6 py-4 text-gray-500">2 days ago</td>
+                                <td class="px-6 py-4 text-right">
+                                    <a href="email-detail" class="text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">View</a>
+                                </td>
+                            </tr>
+
+                            <!-- Row 7 -->
+                            <tr class="hover:bg-gray-50/50 transition-colors group">
+                                <td class="px-6 py-4 font-medium text-gray-900">support@fake-bank-login.test</td>
+                                <td class="px-6 py-4 text-gray-500 max-w-[200px] lg:max-w-[300px] truncate">Account security notification</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                                        <span class="font-semibold text-red-600">87</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20">Phishing</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-500/20">Quarantined</span>
+                                </td>
+                                <td class="px-6 py-4 text-gray-500">3 days ago</td>
+                                <td class="px-6 py-4 text-right">
+                                    <a href="email-detail" class="text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">View</a>
+                                </td>
+                            </tr>
+
+                            <!-- Row 8 -->
+                            <tr class="hover:bg-gray-50/50 transition-colors group">
+                                <td class="px-6 py-4 font-medium text-gray-900">updates@delivery-update.test</td>
+                                <td class="px-6 py-4 text-gray-500 max-w-[200px] lg:max-w-[300px] truncate">Package tracking update</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
+                                        <span class="font-semibold text-yellow-600">38</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20">Suspicious</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20">Analysed</span>
+                                </td>
+                                <td class="px-6 py-4 text-gray-500">3 days ago</td>
+                                <td class="px-6 py-4 text-right">
+                                    <a href="email-detail" class="text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">View</a>
+                                </td>
+                            </tr>
+
+                            <!-- Row 9 -->
+                            <tr class="hover:bg-gray-50/50 transition-colors group">
+                                <td class="px-6 py-4 font-medium text-gray-900">security@company-demo.test</td>
+                                <td class="px-6 py-4 text-gray-500 max-w-[200px] lg:max-w-[300px] truncate">MFA confirmation code</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                        <span class="font-semibold text-green-600">18</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20">Safe</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20">Released</span>
+                                </td>
+                                <td class="px-6 py-4 text-gray-500">4 days ago</td>
+                                <td class="px-6 py-4 text-right">
+                                    <a href="email-detail" class="text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">View</a>
+                                </td>
+                            </tr>
+
+                            <!-- Row 10 -->
+                            <tr class="hover:bg-gray-50/50 transition-colors group">
+                                <td class="px-6 py-4 font-medium text-gray-900">invoice@cloud-billing-demo.test</td>
+                                <td class="px-6 py-4 text-gray-500 max-w-[200px] lg:max-w-[300px] truncate">Payment method update required</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                                        <span class="font-semibold text-orange-600">64</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20">Suspicious</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20">Needs Review</span>
+                                </td>
+                                <td class="px-6 py-4 text-gray-500">4 days ago</td>
+                                <td class="px-6 py-4 text-right">
+                                    <a href="email-detail" class="text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">View</a>
+                                </td>
+                            </tr>
+                            
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty State (Hidden by default, remove 'hidden' class to show) -->
+                <div class="hidden flex flex-col items-center justify-center py-16 px-4 text-center">
+                    <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4">
+                        <iconify-icon icon="solar:inbox-linear" width="24" height="24" style="stroke-width: 1.5;"></iconify-icon>
+                    </div>
+                    <h3 class="text-sm font-semibold text-gray-900 mb-1">No emails found</h3>
+                    <p class="text-sm text-gray-500 mb-4">Try clearing filters or analyse a new email.</p>
+                    <button type="button" class="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+                        Clear filters
+                    </button>
+                </div>
+            </div>
+
+            <!-- Footer Spacing -->
+            <div class="h-4"></div>
+            
+        </main>
+    </div>
+
+
+</body></html>

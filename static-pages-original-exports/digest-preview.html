@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Digest Preview - PhishGuard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<style>
+body { font-family: 'Inter', sans-serif; }
+/* Custom select styling to remove default arrow and add custom focus */
+select {
+appearance: none;
+background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+background-position: right 0.5rem center;
+background-repeat: no-repeat;
+background-size: 1.5em 1.5em;
+}
+</style></head>
+<body class="bg-slate-50 text-slate-800 antialiased h-screen flex overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex-col hidden lg:flex shrink-0">
+        <!-- Logo Area -->
+        <div class="h-16 flex items-center px-6 border-b border-slate-100 shrink-0">
+            <div class="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center mr-3 shadow-sm">
+                <i data-lucide="shield" class="text-white w-4 h-4" stroke-width="1.5"></i>
+            </div>
+            <span class="font-semibold text-lg tracking-tight text-slate-900">PhishGuard</span>
+            <span class="ml-2 text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">Lite</span>
+        </div>
+
+        <!-- Navigation -->
+        <div class="flex-1 overflow-y-auto py-6 px-4 space-y-8">
+            <!-- Overview Section -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">Overview</h3>
+                <nav class="space-y-1">
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <i data-lucide="layout-dashboard" class="mr-3 w-4 h-4 text-slate-400" stroke-width="1.5"></i>
+                        Dashboard
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <i data-lucide="mail" class="mr-3 w-4 h-4 text-slate-400" stroke-width="1.5"></i>
+                        All Emails
+                    </a>
+                    <a href="#" class="flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <div class="flex items-center">
+                            <i data-lucide="shield-alert" class="mr-3 w-4 h-4 text-slate-400" stroke-width="1.5"></i>
+                            Quarantine
+                        </div>
+                        <span class="text-xs bg-rose-100/80 text-rose-600 py-0.5 px-2 rounded-full font-medium">1,011</span>
+                    </a>
+                </nav>
+            </div>
+
+            <!-- Tools Section -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">Tools</h3>
+                <nav class="space-y-1">
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <i data-lucide="cloud-lightning" class="mr-3 w-4 h-4 text-slate-400" stroke-width="1.5"></i>
+                        Manual Analysis
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <i data-lucide="bot" class="mr-3 w-4 h-4 text-slate-400" stroke-width="1.5"></i>
+                        AI Assistant
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl bg-indigo-50/70 text-indigo-700 transition-colors">
+                        <i data-lucide="file-text" class="mr-3 w-4 h-4 text-indigo-600" stroke-width="1.5"></i>
+                        Digest Preview
+                    </a>
+                </nav>
+            </div>
+
+            <!-- System Section -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">System</h3>
+                <nav class="space-y-1">
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <i data-lucide="settings-2" class="mr-3 w-4 h-4 text-slate-400" stroke-width="1.5"></i>
+                        Sensitivity Settings
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- User Profile -->
+        <div class="p-4 border-t border-slate-100 shrink-0">
+            <button class="flex items-center w-full hover:bg-slate-50 p-2 rounded-xl transition-colors group text-left">
+                <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-medium shadow-sm">SA</div>
+                <div class="ml-3 flex-1 overflow-hidden">
+                    <p class="text-sm font-medium text-slate-900 truncate">Security Admin</p>
+                    <p class="text-xs text-slate-500 truncate group-hover:text-slate-700">Sign Out</p>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 group-hover:text-slate-600" stroke-width="1.5"></i>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50/50">
+        
+        <!-- Header -->
+        <header class="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 z-20 shrink-0">
+            <div class="flex items-center text-sm">
+                <span class="text-slate-500 hover:text-slate-800 cursor-pointer transition-colors">Tools</span>
+                <i data-lucide="chevron-right" class="w-4 h-4 mx-2 text-slate-400" stroke-width="1.5"></i>
+                <span class="font-medium text-slate-900">Digest Preview</span>
+            </div>
+            <div class="flex items-center space-x-5">
+                <button class="relative text-slate-400 hover:text-slate-600 transition-colors">
+                    <i data-lucide="bell" class="w-5 h-5" stroke-width="1.5"></i>
+                    <span class="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Scrollable Content Area -->
+        <div class="flex-1 overflow-y-auto p-8">
+            <div class="max-w-7xl mx-auto space-y-8">
+                
+                <!-- Page Header -->
+                <div class="mb-8">
+                    <h2 class="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-2">Recipient Communication</h2>
+                    <h1 class="text-3xl font-semibold text-slate-900 tracking-tight mb-2">Quarantine Digest Preview</h1>
+                    <p class="text-base text-slate-500">Preview the explanation that would be sent to a recipient when an email is quarantined.</p>
+                </div>
+
+                <!-- Main Layout Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    
+                    <!-- Left Column: Controls & Actions -->
+                    <div class="lg:col-span-4 space-y-6">
+                        
+                        <!-- Controls Card -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                            <h3 class="text-base font-semibold text-slate-900 mb-5">Digest Configuration</h3>
+                            
+                            <form id="digest-form" class="space-y-5">
+                                <div>
+                                    <label for="quarantined-email" class="block text-sm font-medium text-slate-700 mb-1.5">Select Quarantined Email</label>
+                                    <select id="quarantined-email" class="block w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                                        <option>Urgent: Verify your account immediately</option>
+                                        <option>Invoice #99214 Payment Required</option>
+                                        <option>IT Helpdesk: Password Expiry Notice</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label for="recipient-email" class="block text-sm font-medium text-slate-700 mb-1.5">Recipient Email Address</label>
+                                    <input type="email" id="recipient-email" value="user@company-demo.test" required="" class="block w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder:text-slate-400">
+                                </div>
+
+                                <button type="submit" class="w-full bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center hover:bg-slate-800 transition-colors shadow-sm active:scale-[0.98]">
+                                    <iconify-icon icon="solar:plain-2-linear" class="w-4 h-4 mr-2" style="font-size: 16px;" stroke-width="1.5"></iconify-icon>
+                                    Log Digest in Demo Mode
+                                </button>
+                            </form>
+
+                            <!-- Success Message (Hidden by default) -->
+                            <div id="log-message" class="hidden mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-start">
+                                <iconify-icon icon="solar:check-circle-linear" class="text-emerald-600 mt-0.5 mr-2" style="font-size: 18px;" stroke-width="1.5"></iconify-icon>
+                                <div>
+                                    <p class="text-sm font-medium text-emerald-800">Digest logged in demo mode.</p>
+                                    <p class="text-xs text-emerald-600 mt-0.5">No real email sent. Logged at <span id="log-time" class="font-semibold"></span></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Demo Mode Notice -->
+                        <div class="bg-amber-50/80 rounded-2xl border border-amber-200/60 p-6">
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 mt-0.5">
+                                    <iconify-icon icon="solar:info-circle-linear" class="text-amber-600" style="font-size: 20px;" stroke-width="1.5"></iconify-icon>
+                                </div>
+                                <div class="ml-3.5">
+                                    <h4 class="text-sm font-medium text-amber-900 mb-1">MVP Preview Environment</h4>
+                                    <p class="text-sm text-amber-700/90 leading-relaxed">SMTP and real email delivery are not connected in this preview state. This page demonstrates the layout and user-facing explanation logic only.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Right Column: Email Preview Card -->
+                    <div class="lg:col-span-8">
+                        
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
+                            <!-- "Browser" Header line -->
+                            <div class="bg-slate-50/80 border-b border-slate-200 px-6 py-3 flex items-center">
+                                <span class="text-xs font-semibold text-slate-500 uppercase tracking-widest">Email Client Preview</span>
+                            </div>
+
+                            <!-- Inner Email Container -->
+                            <div class="p-6 md:p-8 bg-slate-50/30 flex-1 flex flex-col items-center justify-start">
+                                
+                                <div class="w-full max-w-2xl bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
+                                    
+                                    <!-- Email Header Meta -->
+                                    <div class="border-b border-slate-100 p-5 space-y-3">
+                                        <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
+                                            <span class="text-sm font-medium text-slate-500 w-16">Subject:</span>
+                                            <span class="text-base font-semibold text-slate-900 tracking-tight">PhishGuard Alert: Suspicious Email Quarantined</span>
+                                        </div>
+                                        <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
+                                            <span class="text-sm font-medium text-slate-500 w-16">To:</span>
+                                            <span class="text-sm text-slate-600">user@company-demo.test</span>
+                                        </div>
+                                        <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
+                                            <span class="text-sm font-medium text-slate-500 w-16">From:</span>
+                                            <span class="text-sm text-slate-600">security@phishguard-system.internal</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Email Body Content -->
+                                    <div class="p-6 sm:p-8 space-y-8">
+                                        
+                                        <!-- Alert Banner -->
+                                        <div class="flex items-center justify-center bg-rose-50 rounded-lg border border-rose-100 py-3">
+                                            <iconify-icon icon="solar:shield-warning-linear" class="text-rose-600 mr-2" style="font-size: 20px;" stroke-width="1.5"></iconify-icon>
+                                            <span class="text-sm font-semibold text-rose-800">Security Intervention Notice</span>
+                                        </div>
+
+                                        <p class="text-sm text-slate-700 leading-relaxed">
+                                            Hello,<br><br>
+                                            Our automated security systems intercepted and quarantined an email sent to you before it reached your inbox. The message exhibits high-risk indicators commonly associated with malicious campaigns.
+                                        </p>
+
+                                        <!-- Message Details Box -->
+                                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+                                            <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Message Details</h4>
+                                            
+                                            <div class="grid grid-cols-1 sm:grid-cols-[120px_1fr] gap-2 sm:gap-4 items-baseline">
+                                                <span class="text-sm font-medium text-slate-500">Flagged Email:</span>
+                                                <span class="text-sm font-medium text-slate-900">Urgent: Verify your account immediately</span>
+                                                
+                                                <span class="text-sm font-medium text-slate-500">Sender:</span>
+                                                <span class="text-sm text-slate-900 font-mono text-xs bg-white border border-slate-200 px-1.5 py-0.5 rounded">security@fake-bank-login.test</span>
+                                                
+                                                <span class="text-sm font-medium text-slate-500 mt-2 sm:mt-0">Risk Score:</span>
+                                                <div class="flex items-center">
+                                                    <span class="inline-flex items-center bg-rose-100 text-rose-700 text-xs font-semibold px-2 py-1 rounded-md border border-rose-200">
+                                                        92/100 Critical
+                                                    </span>
+                                                </div>
+
+                                                <span class="text-sm font-medium text-slate-500">Classification:</span>
+                                                <span class="text-sm text-slate-900">Phishing</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Why it was blocked -->
+                                        <div>
+                                            <h4 class="text-sm font-semibold text-slate-900 mb-3">Why it was quarantined:</h4>
+                                            <ul class="space-y-2.5">
+                                                <li class="flex items-start">
+                                                    <iconify-icon icon="solar:clock-circle-linear" class="text-amber-500 mt-0.5 mr-2.5 shrink-0" style="font-size: 16px;" stroke-width="1.5"></iconify-icon>
+                                                    <span class="text-sm text-slate-600">Urgency language detected prompting immediate action.</span>
+                                                </li>
+                                                <li class="flex items-start">
+                                                    <iconify-icon icon="solar:key-minimalistic-linear" class="text-indigo-500 mt-0.5 mr-2.5 shrink-0" style="font-size: 16px;" stroke-width="1.5"></iconify-icon>
+                                                    <span class="text-sm text-slate-600">Credential request detected in the message body.</span>
+                                                </li>
+                                                <li class="flex items-start">
+                                                    <iconify-icon icon="solar:link-broken-linear" class="text-rose-500 mt-0.5 mr-2.5 shrink-0" style="font-size: 16px;" stroke-width="1.5"></iconify-icon>
+                                                    <span class="text-sm text-slate-600">Displayed link text and actual destination URL do not match.</span>
+                                                </li>
+                                                <li class="flex items-start">
+                                                    <iconify-icon icon="solar:server-square-linear" class="text-slate-400 mt-0.5 mr-2.5 shrink-0" style="font-size: 16px;" stroke-width="1.5"></iconify-icon>
+                                                    <span class="text-sm text-slate-600">SPF/DKIM/DMARC authentication failed for the sender domain.</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        <!-- Recommended Action -->
+                                        <div>
+                                            <h4 class="text-sm font-semibold text-slate-900 mb-1.5">Recommended Action:</h4>
+                                            <p class="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                                Do not attempt to contact the sender. If you were expecting this message, please review it carefully with your IT security team before requesting release.
+                                            </p>
+                                        </div>
+
+                                        <!-- Interactive Feedback Area -->
+                                        <div class="pt-6 border-t border-slate-100">
+                                            <p class="text-sm font-medium text-slate-900 mb-4 text-center">Help us improve our detection. Was this a mistake?</p>
+                                            
+                                            <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+                                                <button type="button" class="w-full sm:w-auto px-4 py-2 border border-slate-200 rounded-xl shadow-sm bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center">
+                                                    <iconify-icon icon="solar:shield-check-linear" class="mr-2 text-emerald-600" style="font-size: 16px;" stroke-width="1.5"></iconify-icon>
+                                                    This is safe (Release)
+                                                </button>
+                                                <button type="button" class="w-full sm:w-auto px-4 py-2 border border-slate-200 rounded-xl shadow-sm bg-rose-50 text-sm font-medium text-rose-700 hover:bg-rose-100 transition-colors flex items-center justify-center">
+                                                    <iconify-icon icon="solar:trash-bin-trash-linear" class="mr-2" style="font-size: 16px;" stroke-width="1.5"></iconify-icon>
+                                                    Confirm Phishing (Delete)
+                                                </button>
+                                            </div>
+                                            
+                                            <p class="text-xs text-slate-400 text-center mt-4">
+                                                These actions would use signed, single-use feedback links in a production backend.
+                                            </p>
+                                        </div>
+
+                                    </div>
+                                </div>
+                                
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize existing Lucide icons in the shell
+        lucide.createIcons();
+
+        // Handle Demo Form Submission
+        document.getElementById('digest-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const messageEl = document.getElementById('log-message');
+            const timeEl = document.getElementById('log-time');
+            
+            // Set current time
+            const now = new Date();
+            timeEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            // Show message
+            messageEl.classList.remove('hidden');
+            
+            // Optional: Hide after 5 seconds
+            setTimeout(() => {
+                messageEl.classList.add('hidden');
+            }, 5000);
+        });
+    </script>
+
+</body></html>

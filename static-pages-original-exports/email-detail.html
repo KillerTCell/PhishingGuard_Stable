@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Email Threat Dashboard - Detail</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<style>
+body { font-family: 'Inter', sans-serif; }
+</style></head>
+<body class="bg-slate-50 text-slate-800 antialiased h-screen flex overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex-col hidden lg:flex shrink-0">
+        <!-- Logo Area -->
+        <div class="h-16 flex items-center px-6 border-b border-slate-100 shrink-0">
+            <div class="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center mr-3 shadow-sm">
+                <iconify-icon icon="solar:shield-linear" width="16" height="16" class="text-white"></iconify-icon>
+            </div>
+            <span class="font-semibold text-lg tracking-tight text-slate-900">PhishGuard</span>
+            <span class="ml-2 text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">Lite</span>
+        </div>
+
+        <!-- Navigation -->
+        <div class="flex-1 overflow-y-auto py-6 px-4 space-y-8">
+            <!-- Overview Section -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">Overview</h3>
+                <nav class="space-y-1">
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <iconify-icon icon="solar:widget-linear" width="16" height="16" class="mr-3 text-slate-400"></iconify-icon>
+                        Dashboard
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl bg-indigo-50/70 text-indigo-700 transition-colors">
+                        <iconify-icon icon="solar:letter-linear" width="16" height="16" class="mr-3 text-indigo-600"></iconify-icon>
+                        All Emails
+                    </a>
+                    <a href="#" class="flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <div class="flex items-center">
+                            <iconify-icon icon="solar:shield-warning-linear" width="16" height="16" class="mr-3 text-slate-400"></iconify-icon>
+                            Quarantine
+                        </div>
+                        <span class="text-xs bg-rose-100/80 text-rose-600 py-0.5 px-2 rounded-full font-medium">1,011</span>
+                    </a>
+                </nav>
+            </div>
+
+            <!-- Tools Section -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">Tools</h3>
+                <nav class="space-y-1">
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <iconify-icon icon="solar:cloud-bolt-linear" width="16" height="16" class="mr-3 text-slate-400"></iconify-icon>
+                        Manual Analysis
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <iconify-icon icon="solar:smart-speaker-linear" width="16" height="16" class="mr-3 text-slate-400"></iconify-icon>
+                        AI Assistant
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <iconify-icon icon="solar:document-text-linear" width="16" height="16" class="mr-3 text-slate-400"></iconify-icon>
+                        Digest Preview
+                    </a>
+                </nav>
+            </div>
+
+            <!-- System Section -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">System</h3>
+                <nav class="space-y-1">
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <iconify-icon icon="solar:settings-linear" width="16" height="16" class="mr-3 text-slate-400"></iconify-icon>
+                        Sensitivity Settings
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- User Profile -->
+        <div class="p-4 border-t border-slate-100 shrink-0">
+            <button class="flex items-center w-full hover:bg-slate-50 p-2 rounded-xl transition-colors group text-left">
+                <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-medium shadow-sm">SA</div>
+                <div class="ml-3 flex-1 overflow-hidden">
+                    <p class="text-sm font-medium text-slate-900 truncate">Security Admin</p>
+                    <p class="text-xs text-slate-500 truncate group-hover:text-slate-700">Sign Out</p>
+                </div>
+                <iconify-icon icon="solar:alt-arrow-right-linear" width="16" height="16" class="text-slate-400 group-hover:text-slate-600"></iconify-icon>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50/50 relative">
+        
+        <!-- Header -->
+        <header class="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 z-20 shrink-0">
+            <div class="flex items-center text-sm">
+                <span class="text-slate-500 hover:text-slate-800 cursor-pointer transition-colors">Overview</span>
+                <iconify-icon icon="solar:alt-arrow-right-linear" width="16" height="16" class="mx-2 text-slate-400"></iconify-icon>
+                <span class="text-slate-500 hover:text-slate-800 cursor-pointer transition-colors">All Emails</span>
+                <iconify-icon icon="solar:alt-arrow-right-linear" width="16" height="16" class="mx-2 text-slate-400"></iconify-icon>
+                <span class="font-medium text-slate-900">Risk Explanation</span>
+            </div>
+            <div class="flex items-center space-x-5">
+                <button class="relative text-slate-400 hover:text-slate-600 transition-colors">
+                    <iconify-icon icon="solar:bell-linear" width="20" height="20"></iconify-icon>
+                    <span class="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Scrollable Content Area -->
+        <div class="flex-1 overflow-y-auto p-8 relative">
+            <div class="max-w-5xl mx-auto space-y-6">
+                
+                <!-- Page Header -->
+                <div class="mb-8">
+                    <a href="#" class="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors mb-6 group">
+                        <iconify-icon icon="solar:arrow-left-linear" width="16" height="16" class="mr-2 group-hover:-translate-x-0.5 transition-transform"></iconify-icon>
+                        Back to All Emails
+                    </a>
+                    <h2 class="text-xs font-semibold text-rose-600 uppercase tracking-widest mb-2 flex items-center">
+                        <iconify-icon icon="solar:shield-warning-linear" width="14" height="14" class="mr-1.5"></iconify-icon>
+                        Risk Explanation
+                    </h2>
+                    <h1 class="text-3xl font-semibold text-slate-900 tracking-tight mb-3">Urgent: Verify your account immediately</h1>
+                    <div class="flex items-center text-sm text-slate-500 space-x-2">
+                        <span class="font-medium text-slate-700">From security@fake-bank-login.test</span>
+                        <span>•</span>
+                        <span>Received today</span>
+                        <span>•</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-700">Currently quarantined</span>
+                    </div>
+                </div>
+
+                <!-- Section 1 & 2: Risk Summary & Explanation -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Risk Summary Area -->
+                    <div class="bg-white rounded-2xl border border-rose-200 shadow-sm p-6 flex flex-col relative overflow-hidden">
+                        <div class="absolute inset-0 bg-gradient-to-br from-rose-50/50 to-transparent pointer-events-none"></div>
+                        
+                        <div class="relative z-10 flex flex-col items-center mb-6">
+                            <div class="w-24 h-24 rounded-full border-4 border-rose-100 flex items-center justify-center mb-3">
+                                <div class="flex items-baseline">
+                                    <span class="text-4xl font-semibold tracking-tight text-rose-600">92</span>
+                                    <span class="text-sm font-medium text-rose-400 ml-0.5">/100</span>
+                                </div>
+                            </div>
+                            <span class="text-sm font-medium text-slate-500 uppercase tracking-wider">Risk Score</span>
+                        </div>
+
+                        <div class="relative z-10 space-y-3 w-full border-t border-slate-100 pt-4">
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-500">Severity</span>
+                                <span class="font-medium text-rose-600 flex items-center">
+                                    <iconify-icon icon="solar:danger-triangle-linear" width="14" height="14" class="mr-1"></iconify-icon> Critical
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-500">Classification</span>
+                                <span class="font-medium text-slate-900">Phishing</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-500">Status</span>
+                                <span class="font-medium text-slate-900">Quarantined</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-500">Threshold Used</span>
+                                <span class="font-medium text-slate-900">75</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-500">Action</span>
+                                <span class="font-medium text-slate-900">Blocked for review</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Explanation Card -->
+                    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-center">
+                        <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-4 text-slate-600 shadow-sm">
+                            <iconify-icon icon="solar:info-circle-linear" width="20" height="20"></iconify-icon>
+                        </div>
+                        <h3 class="text-xl font-semibold tracking-tight text-slate-900 mb-3">Why this email was flagged</h3>
+                        <p class="text-base text-slate-600 leading-relaxed">
+                            This email was flagged because it uses urgent account-lock language, requests password verification, contains a mismatch between the displayed bank link and the actual URL, and has failed SPF, DKIM, and DMARC authentication evidence.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 3: Evidence Grid -->
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 mb-4 px-1">Detection Evidence</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        
+                        <!-- Evidence 1 -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                            <div class="flex justify-between items-start mb-3">
+                                <h4 class="text-sm font-medium text-slate-900 flex items-center">
+                                    <iconify-icon icon="solar:clock-circle-linear" width="16" height="16" class="mr-2 text-slate-400"></iconify-icon>
+                                    Urgency Language
+                                </h4>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200/60">High</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mb-4 h-8">“Your account has been locked”</p>
+                            <div class="flex justify-between items-center border-t border-slate-100 pt-3">
+                                <span class="text-xs text-slate-400">Contribution</span>
+                                <span class="text-sm font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">+18</span>
+                            </div>
+                        </div>
+
+                        <!-- Evidence 2 -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                            <div class="flex justify-between items-start mb-3">
+                                <h4 class="text-sm font-medium text-slate-900 flex items-center">
+                                    <iconify-icon icon="solar:key-linear" width="16" height="16" class="mr-2 text-slate-400"></iconify-icon>
+                                    Credential Request
+                                </h4>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200/60">Critical</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mb-4 h-8">“Verify your password”</p>
+                            <div class="flex justify-between items-center border-t border-slate-100 pt-3">
+                                <span class="text-xs text-slate-400">Contribution</span>
+                                <span class="text-sm font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">+22</span>
+                            </div>
+                        </div>
+
+                        <!-- Evidence 3 -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                            <div class="flex justify-between items-start mb-3">
+                                <h4 class="text-sm font-medium text-slate-900 flex items-center">
+                                    <iconify-icon icon="solar:link-linear" width="16" height="16" class="mr-2 text-slate-400"></iconify-icon>
+                                    Link Mismatch
+                                </h4>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200/60">Critical</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mb-4 h-8">Displayed bank link does not match the actual URL</p>
+                            <div class="flex justify-between items-center border-t border-slate-100 pt-3">
+                                <span class="text-xs text-slate-400">Contribution</span>
+                                <span class="text-sm font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">+25</span>
+                            </div>
+                        </div>
+
+                        <!-- Evidence 4 -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                            <div class="flex justify-between items-start mb-3">
+                                <h4 class="text-sm font-medium text-slate-900 flex items-center">
+                                    <iconify-icon icon="solar:shield-cross-linear" width="16" height="16" class="mr-2 text-slate-400"></iconify-icon>
+                                    SPF/DKIM/DMARC Failure
+                                </h4>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200/60">High</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mb-4 h-8">Header evidence shows failed authentication</p>
+                            <div class="flex justify-between items-center border-t border-slate-100 pt-3">
+                                <span class="text-xs text-slate-400">Contribution</span>
+                                <span class="text-sm font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">+19</span>
+                            </div>
+                        </div>
+
+                        <!-- Evidence 5 -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                            <div class="flex justify-between items-start mb-3">
+                                <h4 class="text-sm font-medium text-slate-900 flex items-center">
+                                    <iconify-icon icon="solar:user-cross-linear" width="16" height="16" class="mr-2 text-slate-400"></iconify-icon>
+                                    Sender / Reply-To Mismatch
+                                </h4>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">Medium</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mb-4 h-8">Sender domain does not align with claimed brand</p>
+                            <div class="flex justify-between items-center border-t border-slate-100 pt-3">
+                                <span class="text-xs text-slate-400">Contribution</span>
+                                <span class="text-sm font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">+8</span>
+                            </div>
+                        </div>
+
+                        <!-- Evidence 6 -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                            <div class="flex justify-between items-start mb-3">
+                                <h4 class="text-sm font-medium text-slate-900 flex items-center">
+                                    <iconify-icon icon="solar:global-linear" width="16" height="16" class="mr-2 text-slate-400"></iconify-icon>
+                                    Suspicious Domain
+                                </h4>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200/60">High</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mb-4 h-8">fake-bank-login.test</p>
+                            <div class="flex justify-between items-center border-t border-slate-100 pt-3">
+                                <span class="text-xs text-slate-400">Contribution</span>
+                                <span class="text-sm font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">+12</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Section 4 & 7: Body & Audit Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    <!-- Sanitised Email Body Card -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-slate-900">Sanitised Email Body</h3>
+                            <span class="text-xs text-slate-400">Plain text rendering</span>
+                        </div>
+                        <div class="p-6 flex-1 bg-slate-50/30">
+                            <pre class="font-mono text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">Your account has been locked. Click here now to verify your password.</pre>
+                        </div>
+                    </div>
+
+                    <!-- Feedback / Audit Panel -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-slate-900">Audit &amp; Review</h3>
+                            <span id="status-badge" class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200/60">
+                                Needs Review
+                            </span>
+                        </div>
+                        <div class="p-6 space-y-4 flex-1">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="block text-xs font-medium text-slate-500 mb-1">Last reviewed by</span>
+                                    <span id="reviewer-name" class="text-sm text-slate-900">Not reviewed yet</span>
+                                </div>
+                                <div>
+                                    <span class="block text-xs font-medium text-slate-500 mb-1">Reviewed at</span>
+                                    <span id="review-date" class="text-sm text-slate-900">—</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="notes" class="block text-xs font-medium text-slate-500 mb-1.5">Reviewer Notes</label>
+                                <textarea id="notes" rows="3" class="w-full rounded-lg border border-slate-200 p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 transition-shadow resize-none" placeholder="Add investigation notes here..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 5: Links Table -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100">
+                        <h3 class="text-sm font-semibold text-slate-900">Extracted Links</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 text-slate-500 font-medium">
+                                <tr>
+                                    <th class="px-6 py-3 border-b border-slate-200 font-medium text-xs uppercase tracking-wider">Displayed Text</th>
+                                    <th class="px-6 py-3 border-b border-slate-200 font-medium text-xs uppercase tracking-wider">Actual URL</th>
+                                    <th class="px-6 py-3 border-b border-slate-200 font-medium text-xs uppercase tracking-wider">Domain</th>
+                                    <th class="px-6 py-3 border-b border-slate-200 font-medium text-xs uppercase tracking-wider">Mismatch</th>
+                                    <th class="px-6 py-3 border-b border-slate-200 font-medium text-xs uppercase tracking-wider">Suspicious</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="px-6 py-4 text-slate-900 font-medium truncate max-w-[200px]" title="https://commonwealthbank.com.au">https://commonwealthbank.com.au</td>
+                                    <td class="px-6 py-4 text-slate-500 truncate max-w-[200px]" title="http://192.168.1.55/verify-login">http://192.168.1.55/verify-login</td>
+                                    <td class="px-6 py-4 text-slate-500">192.168.1.55</td>
+                                    <td class="px-6 py-4">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-700">Yes</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-700">Yes</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 6: Header Evidence Table -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100">
+                        <h3 class="text-sm font-semibold text-slate-900">Header Authentication Analysis</h3>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                        <div class="p-5 flex flex-col space-y-4">
+                            <div>
+                                <span class="block text-xs font-medium text-slate-500 mb-1">SPF</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200/50">fail</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs font-medium text-slate-500 mb-1">DKIM</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200/50">fail</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs font-medium text-slate-500 mb-1">DMARC</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200/50">fail</span>
+                            </div>
+                        </div>
+                        <div class="p-5 flex flex-col space-y-4 lg:col-span-2">
+                            <div>
+                                <span class="block text-xs font-medium text-slate-500 mb-1">Reply-To</span>
+                                <span class="text-sm text-slate-900 font-mono bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">support@fake-bank-login.test</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs font-medium text-slate-500 mb-1">Return-Path</span>
+                                <span class="text-sm text-slate-900 font-mono bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">bounce@fake-bank-login.test</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs font-medium text-slate-500 mb-1">Authentication Result</span>
+                                <span class="text-sm text-rose-600 font-medium">failed alignment</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 8: Review Actions -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-900">Finalise Review</h3>
+                        <p class="text-sm text-slate-500 mt-1">Select an outcome based on your investigation.</p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row w-full sm:w-auto gap-3">
+                        <button onclick="handleAction('safe')" class="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm w-full sm:w-auto text-center focus:outline-none focus:ring-2 focus:ring-slate-200">
+                            Mark as Safe
+                        </button>
+                        <button onclick="handleAction('investigate')" class="px-5 py-2.5 rounded-xl text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors shadow-sm w-full sm:w-auto text-center focus:outline-none focus:ring-2 focus:ring-indigo-200">
+                            Needs Investigation
+                        </button>
+                        <button onclick="handleAction('phishing')" class="px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 transition-colors shadow-sm w-full sm:w-auto text-center focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2">
+                            Confirm Phishing
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Bottom padding for scroll -->
+                <div class="h-8"></div>
+            </div>
+        </div>
+
+        <!-- Toast Notification Area -->
+        <div id="toast" class="absolute bottom-6 right-8 transform translate-y-20 opacity-0 transition-all duration-300 ease-out z-50">
+            <div class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg flex items-center text-sm font-medium">
+                <iconify-icon icon="solar:check-circle-linear" width="18" height="18" class="mr-2 text-emerald-400"></iconify-icon>
+                <span id="toast-message">Review action saved in demo mode.</span>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        function handleAction(type) {
+            // Show toast
+            const toast = document.getElementById('toast');
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            // Update Audit Panel visually for demo
+            const badge = document.getElementById('status-badge');
+            const reviewer = document.getElementById('reviewer-name');
+            const date = document.getElementById('review-date');
+            
+            reviewer.textContent = "Security Admin (You)";
+            
+            const now = new Date();
+            date.textContent = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+            if (type === 'safe') {
+                badge.className = "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200/60";
+                badge.textContent = "Marked Safe";
+            } else if (type === 'phishing') {
+                badge.className = "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-rose-100 text-rose-800 border border-rose-200/60";
+                badge.textContent = "Confirmed Phishing";
+            } else {
+                badge.className = "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200/60";
+                badge.textContent = "Investigating";
+            }
+
+            // Hide toast after 3s
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+
+</body></html>

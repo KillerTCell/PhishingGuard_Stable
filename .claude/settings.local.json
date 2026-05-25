@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\koman\\\\Downloads\\\\PhishGuard_Demo\" /B /A)",
+      "Read(//c/Users/koman/Downloads/PhishGuard_Demo/**)",
+      "Read(//c/Users/koman/Downloads/**)",
+      "Bash(sed -i 's/PhishGuard Lite/PhishGuard/g' static-pages-original-exports/ai-assistant.html static-pages-original-exports/all-emails.html static-pages-original-exports/digest-preview.html)",
+      "Bash(sed -i 's/PhishGuard Lite/PhishGuard/g' README.md)",
+      "Read(//tmp/**)",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}

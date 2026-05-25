@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Model Sensitivity Settings - PhishGuard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<style>
+body { font-family: 'Inter', sans-serif; }
+</style></head>
+<body class="bg-slate-50 text-slate-800 antialiased h-screen flex overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex-col hidden lg:flex shrink-0">
+        <!-- Logo Area -->
+        <div class="h-16 flex items-center px-6 border-b border-slate-100 shrink-0">
+            <div class="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center mr-3 shadow-sm">
+                <iconify-icon icon="solar:shield-linear" class="text-white w-4 h-4"></iconify-icon>
+            </div>
+            <span class="font-semibold text-lg tracking-tight text-slate-900">PhishGuard</span>
+            <span class="ml-2 text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">Lite</span>
+        </div>
+
+        <!-- Navigation -->
+        <div class="flex-1 overflow-y-auto py-6 px-4 space-y-8">
+            <!-- Overview Section -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">Overview</h3>
+                <nav class="space-y-1">
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <iconify-icon icon="solar:widget-5-linear" class="mr-3 w-4 h-4 text-slate-400"></iconify-icon>
+                        Dashboard
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <iconify-icon icon="solar:letter-linear" class="mr-3 w-4 h-4 text-slate-400"></iconify-icon>
+                        All Emails
+                    </a>
+                    <a href="#" class="flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <div class="flex items-center">
+                            <iconify-icon icon="solar:shield-warning-linear" class="mr-3 w-4 h-4 text-slate-400"></iconify-icon>
+                            Quarantine
+                        </div>
+                        <span class="text-xs bg-rose-100/80 text-rose-600 py-0.5 px-2 rounded-full font-medium">1,011</span>
+                    </a>
+                </nav>
+            </div>
+
+            <!-- Tools Section -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">Tools</h3>
+                <nav class="space-y-1">
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <iconify-icon icon="solar:bolt-linear" class="mr-3 w-4 h-4 text-slate-400"></iconify-icon>
+                        Manual Analysis
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <iconify-icon icon="solar:magic-stick-3-linear" class="mr-3 w-4 h-4 text-slate-400"></iconify-icon>
+                        AI Assistant
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                        <iconify-icon icon="solar:document-text-linear" class="mr-3 w-4 h-4 text-slate-400"></iconify-icon>
+                        Digest Preview
+                    </a>
+                </nav>
+            </div>
+
+            <!-- System Section -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">System</h3>
+                <nav class="space-y-1">
+                    <a href="#" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl bg-indigo-50/70 text-indigo-700 transition-colors">
+                        <iconify-icon icon="solar:settings-linear" class="mr-3 w-4 h-4 text-indigo-600"></iconify-icon>
+                        Sensitivity Settings
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- User Profile -->
+        <div class="p-4 border-t border-slate-100 shrink-0">
+            <button class="flex items-center w-full hover:bg-slate-50 p-2 rounded-xl transition-colors group text-left">
+                <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-medium shadow-sm">SA</div>
+                <div class="ml-3 flex-1 overflow-hidden">
+                    <p class="text-sm font-medium text-slate-900 truncate">Security Admin</p>
+                    <p class="text-xs text-slate-500 truncate group-hover:text-slate-700">Sign Out</p>
+                </div>
+                <iconify-icon icon="solar:alt-arrow-right-linear" class="w-4 h-4 text-slate-400 group-hover:text-slate-600"></iconify-icon>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50/50">
+        
+        <!-- Header -->
+        <header class="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 z-20 shrink-0">
+            <div class="flex items-center text-sm">
+                <span class="text-slate-500 hover:text-slate-800 cursor-pointer transition-colors">System</span>
+                <iconify-icon icon="solar:alt-arrow-right-linear" class="w-4 h-4 mx-2 text-slate-400"></iconify-icon>
+                <span class="font-medium text-slate-900">Sensitivity Settings</span>
+            </div>
+            <div class="flex items-center space-x-5">
+                <button class="relative text-slate-400 hover:text-slate-600 transition-colors">
+                    <iconify-icon icon="solar:bell-linear" class="w-5 h-5"></iconify-icon>
+                    <span class="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Scrollable Content Area -->
+        <div class="flex-1 overflow-y-auto p-8">
+            <div class="max-w-7xl mx-auto space-y-8">
+                
+                <!-- Page Header -->
+                <div class="mb-8">
+                    <h2 class="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-2">Admin Settings</h2>
+                    <h1 class="text-3xl font-semibold text-slate-900 tracking-tight mb-2">Model Sensitivity Settings</h1>
+                    <p class="text-base text-slate-500">Control the future risk threshold used for quarantine decisions.</p>
+                </div>
+
+                <!-- Settings Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Left Column: Controls -->
+                    <div class="lg:col-span-2 space-y-6">
+                        
+                        <!-- Current Threshold Card -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-7 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div>
+                                <h3 class="text-sm font-medium text-slate-500 mb-2">Current Active Threshold</h3>
+                                <div class="flex items-baseline mb-2">
+                                    <span class="text-5xl font-semibold tracking-tight text-slate-900">75</span>
+                                    <span class="text-xl font-medium text-slate-400 ml-1">/100</span>
+                                </div>
+                                <p class="text-sm text-slate-600">Emails scoring 75 or above are automatically quarantined.</p>
+                            </div>
+                            <div class="bg-slate-50 rounded-xl p-5 border border-slate-100 min-w-[240px]">
+                                <ul class="space-y-3.5 text-sm">
+                                    <li class="flex justify-between items-center">
+                                        <span class="text-slate-500">Last updated by</span>
+                                        <span class="font-medium text-slate-900">Security Admin</span>
+                                    </li>
+                                    <li class="flex justify-between items-center">
+                                        <span class="text-slate-500">Last updated at</span>
+                                        <span class="font-medium text-slate-900">Today, 9:37 PM</span>
+                                    </li>
+                                    <li class="flex justify-between items-center pt-3.5 border-t border-slate-200">
+                                        <span class="text-slate-500">Previous threshold</span>
+                                        <span class="font-medium text-slate-900">70</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Sensitivity Slider Card -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-7 shadow-sm">
+                            <div class="flex items-start justify-between mb-8">
+                                <div>
+                                    <h3 class="text-xl font-medium tracking-tight text-slate-900">Adjust Sensitivity</h3>
+                                    <p class="text-sm text-slate-500 mt-1">Simulate and set a new model threshold.</p>
+                                </div>
+                                <div class="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-2 flex items-center shadow-sm">
+                                    <span class="text-lg font-semibold text-indigo-700" id="current-slider-val">75</span>
+                                </div>
+                            </div>
+
+                            <div class="mb-8">
+                                <input type="range" min="0" max="100" value="75" id="thresholdSlider" class="w-full appearance-none bg-transparent cursor-pointer
+                                [&amp;::-webkit-slider-runnable-track]:h-2 [&amp;::-webkit-slider-runnable-track]:bg-slate-200 [&amp;::-webkit-slider-runnable-track]:rounded-full
+                                [&amp;::-webkit-slider-thumb]:appearance-none [&amp;::-webkit-slider-thumb]:w-5 [&amp;::-webkit-slider-thumb]:h-5 [&amp;::-webkit-slider-thumb]:bg-indigo-600 [&amp;::-webkit-slider-thumb]:rounded-full [&amp;::-webkit-slider-thumb]:-mt-1.5 [&amp;::-webkit-slider-thumb]:shadow-sm [&amp;::-webkit-slider-thumb]:transition-transform hover:[&amp;::-webkit-slider-thumb]:scale-110
+                                [&amp;::-moz-range-track]:h-2 [&amp;::-moz-range-track]:bg-slate-200 [&amp;::-moz-range-track]:rounded-full
+                                [&amp;::-moz-range-thumb]:appearance-none [&amp;::-moz-range-thumb]:w-5 [&amp;::-moz-range-thumb]:h-5 [&amp;::-moz-range-thumb]:bg-indigo-600 [&amp;::-moz-range-thumb]:border-none [&amp;::-moz-range-thumb]:rounded-full [&amp;::-moz-range-thumb]:shadow-sm hover:[&amp;::-moz-range-thumb]:scale-110" oninput="document.getElementById('current-slider-val').innerText = this.value; document.getElementById('preview-val-title').innerText = this.value;">
+
+                                <div class="flex justify-between text-xs font-medium text-slate-400 mt-4 px-1">
+                                    <span>0 (Strict)</span>
+                                    <span>50 (Balanced)</span>
+                                    <span>100 (Lenient)</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                <p class="text-sm text-slate-600 leading-relaxed">
+                                    <span class="font-medium text-slate-900">How it works:</span> Lower threshold means stricter detection and more emails quarantined. Higher threshold means more lenient detection and fewer emails quarantined.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Save Button Block -->
+                        <button onclick="alert('Sensitivity threshold saved in demo mode.')" class="w-full bg-slate-900 text-white rounded-xl py-3.5 text-sm font-medium shadow-sm hover:bg-slate-800 transition-colors flex items-center justify-center active:scale-[0.99]">
+                            Save Sensitivity
+                            <iconify-icon icon="solar:check-circle-linear" class="ml-2 w-4 h-4"></iconify-icon>
+                        </button>
+                    </div>
+
+                    <!-- Right Column: Information & Preview -->
+                    <div class="space-y-6">
+                        
+                        <!-- Impact Preview Card -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-7 shadow-sm">
+                            <h3 class="text-xl font-medium tracking-tight text-slate-900 mb-1">Impact Preview</h3>
+                            <p class="text-sm text-slate-500 mb-6">At threshold <span id="preview-val-title" class="font-semibold text-indigo-600">75</span> (based on last 30 days):</p>
+
+                            <div class="space-y-4 mb-8">
+                                <div class="flex items-center justify-between p-4 bg-rose-50 border border-rose-100 rounded-xl">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-rose-600 shadow-sm mr-3">
+                                            <iconify-icon icon="solar:shield-warning-linear" class="w-4 h-4"></iconify-icon>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-900">5 Quarantined</p>
+                                            <p class="text-xs text-slate-500 mt-0.5">2 critical, 3 high</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-emerald-600 shadow-sm mr-3">
+                                            <iconify-icon icon="solar:shield-check-linear" class="w-4 h-4"></iconify-icon>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-900">5 Released</p>
+                                            <p class="text-xs text-slate-500 mt-0.5">Low or safe severity</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Severity Breakdown</h4>
+                            <div class="space-y-3.5">
+                                <div class="flex justify-between items-center text-sm">
+                                    <div class="flex items-center text-slate-600"><span class="w-2 h-2 rounded-full bg-rose-500 mr-2.5"></span>Critical</div>
+                                    <span class="font-medium text-slate-900">2</span>
+                                </div>
+                                <div class="flex justify-between items-center text-sm">
+                                    <div class="flex items-center text-slate-600"><span class="w-2 h-2 rounded-full bg-amber-500 mr-2.5"></span>High</div>
+                                    <span class="font-medium text-slate-900">3</span>
+                                </div>
+                                <div class="flex justify-between items-center text-sm">
+                                    <div class="flex items-center text-slate-600"><span class="w-2 h-2 rounded-full bg-amber-300 mr-2.5"></span>Medium</div>
+                                    <span class="font-medium text-slate-900">2</span>
+                                </div>
+                                <div class="flex justify-between items-center text-sm">
+                                    <div class="flex items-center text-slate-600"><span class="w-2 h-2 rounded-full bg-emerald-400 mr-2.5"></span>Low / Safe</div>
+                                    <span class="font-medium text-slate-900">3</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Threshold Guidance Card -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-7 shadow-sm">
+                            <div class="flex items-center mb-4 text-indigo-600">
+                                <iconify-icon icon="solar:info-circle-linear" class="w-5 h-5 mr-2"></iconify-icon>
+                                <h3 class="text-base font-semibold text-slate-900">Threshold Guidance</h3>
+                            </div>
+                            <ul class="space-y-3 text-sm text-slate-600 list-disc pl-5 marker:text-slate-300">
+                                <li class="pl-1">A stricter threshold (lower number) may catch more phishing but can increase false positives.</li>
+                                <li class="pl-1">A more lenient threshold (higher number) may reduce quarantine volume but can miss suspicious emails.</li>
+                                <li class="pl-1">The MVP uses this setting for all future scoring decisions across the platform.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Role Permission Card -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-7 shadow-sm">
+                            <div class="flex items-center mb-4 text-amber-500">
+                                <iconify-icon icon="solar:lock-keyhole-linear" class="w-5 h-5 mr-2"></iconify-icon>
+                                <h3 class="text-base font-semibold text-slate-900">Role Permissions</h3>
+                            </div>
+                            <div class="space-y-3 text-sm text-slate-600">
+                                <p><span class="font-medium text-slate-900">Admin users</span> can edit this setting.</p>
+                                <p><span class="font-medium text-slate-900">Analyst users</span> can view but cannot change model sensitivity.</p>
+                                <div class="mt-4 p-3.5 bg-slate-50 border border-slate-100 rounded-lg text-xs text-slate-500 font-medium">
+                                    Production backend must enforce RBAC, not only the frontend.
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+
+</body></html>

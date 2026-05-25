@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - PhishGuard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<style>
+body { font-family: 'Inter', sans-serif; }
+</style></head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col items-center justify-center p-4 sm:p-8 selection:bg-indigo-100 selection:text-indigo-900">
+
+    <main class="w-full max-w-[400px] flex flex-col items-center">
+        <!-- Main Login Card -->
+        <div class="w-full bg-white rounded-2xl border border-slate-200 p-8 shadow-sm relative z-10">
+            
+            <!-- Header -->
+            <div class="flex flex-col items-center text-center mb-8">
+                <div class="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center mb-5 shadow-sm">
+                    <iconify-icon icon="solar:shield-linear" class="text-white text-xl" style="stroke-width: 1.5;"></iconify-icon>
+                </div>
+                <div class="flex items-center justify-center mb-2">
+                    <span class="font-semibold text-lg tracking-tight text-slate-900">PhishGuard</span>
+                    <span class="ml-2 text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">Lite</span>
+                </div>
+                <h1 class="text-2xl font-semibold tracking-tight text-slate-900 mb-2 mt-4">Welcome back</h1>
+                <p class="text-sm text-slate-500">Secure access for the phishing detection dashboard.</p>
+            </div>
+
+            <!-- Error Alert (Hidden by default) -->
+            <div id="login-alert" class="hidden flex items-center bg-rose-50 border border-rose-100 text-rose-600 px-4 py-3 rounded-xl mb-6 text-sm font-medium">
+                <iconify-icon icon="solar:danger-circle-linear" class="text-lg mr-2.5 shrink-0" style="stroke-width: 1.5;"></iconify-icon>
+                <span id="login-alert-text">Invalid credentials</span>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" class="space-y-5">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-slate-700 mb-1.5">Username</label>
+                    <div class="relative">
+                        <iconify-icon icon="solar:user-linear" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg" style="stroke-width: 1.5;"></iconify-icon>
+                        <input type="text" id="username" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 placeholder:text-slate-400" placeholder="Enter your username">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+                    <div class="relative">
+                        <iconify-icon icon="solar:lock-password-linear" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg" style="stroke-width: 1.5;"></iconify-icon>
+                        <input type="password" id="password" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 placeholder:text-slate-400" placeholder="••••••••">
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="w-full bg-slate-900 text-white rounded-xl py-2.5 text-sm font-medium hover:bg-slate-800 transition-colors shadow-sm active:scale-[0.98] flex items-center justify-center">
+                        Sign In
+                        <iconify-icon icon="solar:arrow-right-linear" class="ml-2 text-base" style="stroke-width: 1.5;"></iconify-icon>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Demo Credentials Note -->
+        <div class="w-full mt-6 bg-white border border-slate-200/70 rounded-xl p-5 shadow-sm text-sm">
+            <h3 class="font-medium text-slate-900 mb-3 flex items-center">
+                <iconify-icon icon="solar:info-circle-linear" class="text-indigo-500 mr-2 text-lg" style="stroke-width: 1.5;"></iconify-icon>
+                Demo Credentials
+            </h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+                    <span class="text-slate-500 font-medium">Admin:</span>
+                    <span class="font-mono text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-sm text-xs">admin / admin123</span>
+                </div>
+                <div class="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+                    <span class="text-slate-500 font-medium">Analyst:</span>
+                    <span class="font-mono text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-sm text-xs">analyst / analyst123</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Note -->
+        <p class="mt-8 text-xs text-slate-400 text-center leading-relaxed max-w-[320px]">
+            This demo uses mock login. Production should use FastAPI authentication, hashed passwords, signed sessions or tokens, and backend-enforced RBAC.
+        </p>
+    </main>
+
+    <script>
+        document.getElementById('login-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const user = document.getElementById('username').value.trim();
+            const pass = document.getElementById('password').value.trim();
+            const alertBox = document.getElementById('login-alert');
+            const alertText = document.getElementById('login-alert-text');
+
+            // Reset alert state
+            alertBox.classList.add('hidden');
+
+            // Validation
+            if (!user || !pass) {
+                alertText.textContent = 'Username and password are required.';
+                alertBox.classList.remove('hidden');
+                return;
+            }
+
+            // Mock Authentication
+            const isValidAdmin = user === 'admin' && pass === 'admin123';
+            const isValidAnalyst = user === 'analyst' && pass === 'analyst123';
+
+            if (isValidAdmin || isValidAnalyst) {
+                // In a real flow, this would redirect to the dashboard page.
+                // Simulating redirect to the main dashboard file:
+                window.location.href = 'index.html'; 
+            } else {
+                alertText.textContent = 'Invalid demo credentials.';
+                alertBox.classList.remove('hidden');
+                
+                // Add a small shake animation to the form for better UX
+                const formCard = document.querySelector('.bg-white.rounded-2xl');
+                formCard.style.transform = 'translateX(5px)';
+                setTimeout(() => formCard.style.transform = 'translateX(-5px)', 50);
+                setTimeout(() => formCard.style.transform = 'translateX(5px)', 100);
+                setTimeout(() => formCard.style.transform = 'translateX(0)', 150);
+                
+                // Clear password field
+                document.getElementById('password').value = '';
+            }
+        });
+    </script>
+
+</body></html>
