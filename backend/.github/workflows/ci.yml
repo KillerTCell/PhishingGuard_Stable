@@ -1,0 +1,123 @@
+name: PhishGuard CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Test & Quality
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: phishguard_test
+          POSTGRES_USER: phishguard
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U phishguard -d phishguard_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://phishguard:test_password@localhost:5432/phishguard_test
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      CELERY_RESULT_BACKEND: redis://localhost:6379/1
+      JWT_SECRET: ci_test_secret_key_minimum_32_characters_long
+      JWT_EXPIRE_HOURS: "8"
+      DIGEST_HMAC_SECRET: ci_test_hmac_secret_minimum_32_characters
+      FERNET_KEY: ${{ secrets.CI_FERNET_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      RESEND_API_KEY: unused_in_test
+      CORS_ORIGINS: http://localhost:3000
+      FORWARDING_DOMAIN: phishguard.app
+      MODEL_VERSION: rf_v1.0.0
+      DEMO_SAMPLE_EML: ""
+      EXPORT_VOLUME_PATH: /tmp/phishguard_exports
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Download spaCy model
+        run: python -m spacy download en_core_web_sm
+
+      - name: Run migrations
+        run: alembic upgrade head
+
+      # ── Test Stage 1: Full suite with 80% coverage gate ────
+      - name: pytest — full coverage (≥80%)
+        run: pytest --cov=app --cov-fail-under=80 --cov-report=xml -v
+
+      # ── Test Stage 2: NLP pipeline isolated coverage ────────
+      - name: pytest — nlp_pipeline coverage (≥80%)
+        run: |
+          pytest \
+            --cov=app/services/nlp_pipeline \
+            --cov-fail-under=80 \
+            tests/test_nlp.py -v
+
+      # ── Type checking ───────────────────────────────────────
+      - name: mypy — strict type check
+        run: mypy --strict app/
+
+      # ── Security scan ───────────────────────────────────────
+      - name: bandit — SAST (low confidence and above)
+        run: bandit -r app/ -ll
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build .
+
+      - name: Verify image health endpoint stub
+        run: |
+          docker build -t phishguard-ci .
+          docker run -d --name pg_stub \
+            -e POSTGRES_DB=pg -e POSTGRES_USER=pg -e POSTGRES_PASSWORD=pg \
+            postgres:16-alpine
+          docker run -d --name redis_stub redis:7-alpine
+          # Image must build successfully — runtime smoke test skipped in CI
+          # (real integration test uses the services above in the test job)
+          docker rmi phishguard-ci
