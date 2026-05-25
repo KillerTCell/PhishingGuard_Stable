@@ -4,7 +4,11 @@ backend/.env
 !backend/.env.example
 
 # ── TLS Certificates (never commit private keys) ─────────────
-backend/nginx/ssl/
+backend/nginx/ssl/*.pem
+backend/nginx/ssl/*.crt
+backend/nginx/ssl/*.key
+backend/nginx/ssl/*.p12
+# generate-dev-cert.sh is tracked — only the actual cert files are excluded
 
 # ── ML Artefacts ─────────────────────────────────────────────
 # model.pkl and metrics.json ARE committed (build artefacts).
