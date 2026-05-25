@@ -8,6 +8,7 @@ fastapi==0.111.0
 uvicorn[standard]==0.29.0
 gunicorn==22.0.0
 pydantic[email]==2.7.1
+pydantic-settings==2.3.4    # BaseSettings was split to its own package in pydantic v2
 python-multipart==0.0.9
 httpx==0.27.0
 starlette==0.37.2
