@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import json
 import math
+import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import redis.asyncio as aioredis
@@ -22,14 +23,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import sign_digest_token
 from app.dependencies import CurrentUser, get_current_user, get_db, get_redis, require_admin
 from app.models.analysis_result import AnalysisResult
 from app.models.audit_log import AuditLog
-from app.models.digest_log import DigestLog
 from app.models.email import Email
 from app.models.email_feature import EmailFeature
 from app.models.feedback import Feedback
-from app.schemas.emails import EmailDetail, EmailFeatureDetail, LinkDetail, AttachmentMetadata
+from app.schemas.emails import AttachmentMetadata, EmailDetail, EmailFeatureDetail, LinkDetail
 from app.schemas.quarantine import (
     DigestPreviewResponse,
     QuarantineActionResponse,
@@ -40,6 +41,22 @@ from app.schemas.quarantine import (
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["quarantine"])
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+
+def _severity(risk_score: int) -> str:
+    """Map risk_score (0–100) to a severity band string."""
+    if risk_score >= 90:
+        return "critical"
+    if risk_score >= 80:
+        return "high"
+    if risk_score >= 30:
+        return "medium"
+    return "low"
 
 
 async def _write_audit(
@@ -56,7 +73,7 @@ async def _write_audit(
         user_id=current_user.id,
         action=action,
         target_type="email",
-        target_id=str(target_id) if target_id else None,
+        target_id=target_id,   # UUID column — do NOT stringify
         ip_address=request.client.host if request.client else None,
         request_id=request.headers.get("x-request-id"),
         detail=detail or {},
@@ -65,14 +82,19 @@ async def _write_audit(
 
 
 async def _publish_sse(redis: aioredis.Redis, org_id: uuid.UUID, event: dict) -> None:
-    """Publish a scan_complete SSE event (best-effort)."""
+    """PUBLISH to the org pub/sub channel + XADD to the org stream (best-effort).
+
+    Both operations use the same JSON payload.  XADD (maxlen 200) feeds the
+    Last-Event-ID replay in events.py (Section 6.2).
+    """
     try:
-        await redis.publish(
-            f"org:{org_id}:events",
-            json.dumps(event),
-        )
+        data = json.dumps(event)
+        channel = f"org:{org_id}:events"
+        stream_key = f"org:{org_id}:stream"
+        await redis.publish(channel, data)
+        await redis.xadd(stream_key, {"data": data}, maxlen=200, approximate=True)
     except Exception:
-        logger.warning("sse_publish_failed", event=event.get("type"))
+        logger.warning("sse_publish_failed", event_type=event.get("type"))
 
 
 # ---------------------------------------------------------------------------
@@ -97,17 +119,43 @@ async def list_quarantine(
 ) -> QuarantineListResponse:
     """Return paginated emails in the quarantine queue.
 
+    Status filter: ``quarantined`` + ``confirmed_phishing`` (Section 4.4).
+    ``feedback_state`` filter is applied via a correlated subquery on the
+    most-recent Feedback row per email.
     A-06 fix: returns ``total_count`` (not ``total``) for the '0 in queue' badge.
     """
+    # Correlated subquery: most-recent Feedback.label per Email row.
+    latest_feedback_label = (
+        select(Feedback.label)
+        .where(Feedback.email_id == Email.id)
+        .order_by(Feedback.created_at.desc())
+        .limit(1)
+        .correlate(Email)
+        .scalar_subquery()
+    )
+
     base = (
-        select(Email, AnalysisResult)
+        select(Email, AnalysisResult, latest_feedback_label.label("feedback_label"))
         .outerjoin(AnalysisResult, AnalysisResult.email_id == Email.id)
-        .where(Email.org_id == current_user.org_id, Email.status == "quarantined")
+        .where(
+            Email.org_id == current_user.org_id,
+            Email.status.in_(("quarantined", "confirmed_phishing")),
+        )
     )
 
     if search:
         like = f"%{search}%"
         base = base.where(Email.sender.ilike(like) | Email.subject.ilike(like))
+
+    # Map UI feedback_state values → Feedback.label values for DB filtering.
+    _state_to_label: dict[str, str] = {
+        "confirmed_phishing": "phishing",
+        "marked_safe": "safe",
+        "needs_investigation": "needs_investigation",
+    }
+    if feedback_state:
+        filter_label = _state_to_label.get(feedback_state, feedback_state)
+        base = base.where(latest_feedback_label == filter_label)
 
     total_count: int = (
         await db.execute(select(func.count()).select_from(base.subquery()))
@@ -123,20 +171,34 @@ async def list_quarantine(
         await db.execute(base.offset((page - 1) * page_size).limit(page_size))
     ).all()
 
-    items = [
-        QuarantineListItem(
-            id=row.Email.id,
-            sender=row.Email.sender,
-            subject=row.Email.subject,
-            risk_score=row.AnalysisResult.risk_score if row.AnalysisResult else None,
-            severity=row.AnalysisResult.severity if row.AnalysisResult else None,
-            top_reason=None,
-            status=row.Email.status,
-            feedback_state=None,
-            received_at=row.Email.received_at,
+    # Map Feedback.label → display feedback_state for list items.
+    _label_to_state: dict[str, str] = {
+        "phishing": "confirmed_phishing",
+        "safe": "marked_safe",
+        "needs_investigation": "needs_investigation",
+    }
+
+    items: list[QuarantineListItem] = []
+    for row in rows:
+        email_row = row.Email
+        ar = row.AnalysisResult
+        risk_score = ar.risk_score if ar else 0
+        top_features: list = ar.top_features if ar else []
+        top_reason = top_features[0].get("name") if top_features else None
+        fb_label: str | None = row.feedback_label
+        items.append(
+            QuarantineListItem(
+                id=email_row.id,
+                sender=email_row.sender,
+                subject=email_row.subject,
+                risk_score=risk_score if ar else None,
+                severity=_severity(risk_score) if ar else None,
+                top_reason=top_reason,
+                status=email_row.status,
+                feedback_state=_label_to_state.get(fb_label) if fb_label else None,
+                received_at=email_row.received_at,
+            )
         )
-        for row in rows
-    ]
 
     pages = max(1, math.ceil(total_count / page_size))
     return QuarantineListResponse(
@@ -166,7 +228,7 @@ async def get_quarantine_detail(
         .where(
             Email.id == email_id,
             Email.org_id == current_user.org_id,
-            Email.status == "quarantined",
+            Email.status.in_(("quarantined", "confirmed_phishing")),
         )
     )
     row = result.one_or_none()
@@ -220,7 +282,7 @@ async def get_quarantine_detail(
         dmarc=email.dmarc,
         risk_score=analysis.risk_score if analysis else None,
         classification=analysis.classification if analysis else None,
-        severity=analysis.severity if analysis else None,
+        severity=_severity(analysis.risk_score) if analysis else None,
         explanation=analysis.explanation if analysis else None,
         top_features=top_features,
         model_version=analysis.model_version if analysis else None,
@@ -246,7 +308,9 @@ async def get_digest_preview(
 ) -> DigestPreviewResponse:
     """Build HTML digest preview without sending.
 
-    can_send=False if recipient_address is NULL (disable Send button in UI).
+    Generates a real HMAC-signed token so the preview renders identical to the
+    live email (no DigestLog INSERT — preview action links will 410 on click).
+    can_send=False if recipient_address is NULL (disables Send button in UI).
     """
     result = await db.execute(
         select(Email, AnalysisResult)
@@ -279,15 +343,19 @@ async def get_digest_preview(
 
     can_send = email.recipient_address is not None
 
-    # Build simple HTML preview (resend_service will use a full template)
+    # Build a real HMAC-signed preview token (no DigestLog INSERT).
+    email_id_str = str(email_id)
+    jti = secrets.token_urlsafe(32)
+    hmac_hex = sign_digest_token(email_id_str, jti)
+    signed_token = f"{email_id_str}:{jti}:{hmac_hex}"
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=72)
+
+    from app.services import resend_service  # noqa: PLC0415
+
+    html_preview = resend_service.build_digest_html(email, analysis, signed_token, expires_at)
+
     risk_score = analysis.risk_score if analysis else 0
     explanation = analysis.explanation if analysis else "Analysis pending."
-    html_preview = (
-        f"<h2>Security Alert: Potential Phishing Email</h2>"
-        f"<p><strong>Risk Score:</strong> {risk_score}/100</p>"
-        f"<p><strong>Assessment:</strong> {explanation}</p>"
-        f"<p>Please review and confirm or release this email.</p>"
-    )
 
     return DigestPreviewResponse(
         html_preview=html_preview,
@@ -319,7 +387,7 @@ async def confirm_phishing(
 ) -> QuarantineActionResponse:
     """Mark a quarantined email as confirmed phishing.
 
-    Updates email.status, inserts feedback, publishes SSE.  UC-03 step 5.
+    Updates email.status, inserts feedback, commits, publishes SSE.  UC-03 step 5.
     """
     email = (
         await db.execute(
@@ -340,9 +408,12 @@ async def confirm_phishing(
         )
     )
     await _write_audit(db, "email_confirmed_phishing", current_user, request, email_id)
+    await db.commit()
+
     await _publish_sse(
-        redis, current_user.org_id,
-        {"type": "scan_complete", "data": {"email_id": str(email_id), "status": "confirmed_phishing"}},
+        redis,
+        current_user.org_id,
+        {"type": "scan_complete", "email_id": str(email_id), "status": "confirmed_phishing"},
     )
     return QuarantineActionResponse(status="confirmed_phishing")
 
@@ -384,9 +455,12 @@ async def release_email(
         )
     )
     await _write_audit(db, "email_released", current_user, request, email_id)
+    await db.commit()
+
     await _publish_sse(
-        redis, current_user.org_id,
-        {"type": "scan_complete", "data": {"email_id": str(email_id), "status": "delivered"}},
+        redis,
+        current_user.org_id,
+        {"type": "scan_complete", "email_id": str(email_id), "status": "delivered"},
     )
     return QuarantineActionResponse(status="delivered")
 
@@ -426,6 +500,7 @@ async def flag_for_investigation(
         )
     )
     await _write_audit(db, "email_flagged_investigation", current_user, request, email_id)
+    await db.commit()
     return QuarantineActionResponse(status="quarantined")
 
 
@@ -446,7 +521,12 @@ async def send_digest(
     current_user: CurrentUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> SendDigestResponse:
-    """Validate can_send and fire send_digest Celery task.  UC-05 step 3."""
+    """Validate can_send and fire send_digest Celery task.  UC-05 step 3.
+
+    The DigestLog row is created (and idempotently upserted on retry) by the
+    Celery task via INSERT ON CONFLICT.  The router pre-generates the UUID so
+    it can be returned to the caller immediately at 202.
+    """
     email = (
         await db.execute(
             select(Email).where(Email.id == email_id, Email.org_id == current_user.org_id)
@@ -461,28 +541,24 @@ async def send_digest(
             detail="Cannot send digest: recipient address is missing",
         )
 
-    from app.core.security import sign_digest_token
-
-    jti = str(uuid.uuid4())
-    # Create digest log
-    digest_log = DigestLog(
-        email_id=email_id,
-        signed_token_jti=jti,
-        recipient_email=email.recipient_address,
-    )
-    db.add(digest_log)
-    await db.flush()
+    # Pre-generate DigestLog UUID — passed to the task for idempotent upsert.
+    log_id = uuid.uuid4()
 
     await _write_audit(
-        db, "digest_sent", current_user, request, email_id,
-        {"digest_log_id": str(digest_log.id)},
+        db,
+        "digest_sent",
+        current_user,
+        request,
+        email_id,
+        {"digest_log_id": str(log_id)},
     )
+    await db.commit()
 
     try:
-        from app.tasks.digest_tasks import send_digest as send_digest_task
+        from app.tasks.digest_tasks import send_digest as send_digest_task  # noqa: PLC0415
 
-        send_digest_task.delay(str(email_id), str(digest_log.id))
+        send_digest_task.delay(str(email_id), str(log_id))
     except Exception:
         logger.warning("digest_task_dispatch_failed", email_id=str(email_id))
 
-    return SendDigestResponse(digest_log_id=digest_log.id)
+    return SendDigestResponse(digest_log_id=log_id)

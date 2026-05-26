@@ -90,8 +90,9 @@ async def digest_action(
     )
     db.add(feedback)
 
-    # UPDATE digest_log.action_taken
+    # UPDATE digest_log.action_taken + action_taken_at
     digest_log.action_taken = action_taken
+    digest_log.action_taken_at = datetime.now(timezone.utc)
 
     # Best-effort audit write (digest_log has org context via email)
     try:
@@ -111,7 +112,7 @@ async def digest_action(
                 user_id=None,
                 action=f"digest_{action_taken}",
                 target_type="email",
-                target_id=str(digest_log.email_id),
+                target_id=digest_log.email_id,
                 detail={"digest_log_id": str(digest_log.id)},
             )
             db.add(log)
@@ -131,6 +132,11 @@ async def digest_action(
             "released to your inbox."
         )
 
+    await db.commit()
+
     html = _html_page(title, message)
-    # CSPMiddleware in main.py adds Content-Security-Policy: default-src 'self'
-    return HTMLResponse(content=html, status_code=200)
+    return HTMLResponse(
+        content=html,
+        status_code=200,
+        headers={"Content-Security-Policy": "default-src 'self'"},
+    )
