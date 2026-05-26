@@ -866,97 +866,91 @@ def generate_explanation(self, email_id: str) -> str:
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=10, queue="analysis")
 def apply_outcome(self, email_id: str) -> str:
-    """Apply auto-quarantine or deliver outcome after classification (FR-05).
+    """Route email and publish SSE by delegating to quarantine_service (FR-05).
 
-    Decision table (evaluated in order):
+    Calls :func:`~app.services.quarantine_service.apply_outcome` inside
+    ``asyncio.run()`` so the fully-async service function can be executed
+    from a synchronous Celery worker.
 
-    * ``classification == 'phishing'`` **and** ``org.auto_quarantine_high_risk``
-      → ``Email.status = 'quarantined'``
-    * ``classification in ('phishing', 'suspicious')``
-      → ``Email.status = 'flagged'``
-    * otherwise (safe or missing)
-      → ``Email.status = 'delivered'``
+    Routing (Section 5.1 Task 5) — handled inside the service:
+        'phishing'   → ``Email.status = 'quarantined'``,
+                        ``AnalysisResult.quarantined = True``,
+                        ``send_digest.delay()`` if auto_quarantine_high_risk
+        'suspicious' → ``Email.status = 'flagged'``,
+                        optional ``[SUSPICIOUS]`` subject prefix
+        'safe'       → ``Email.status = 'delivered'``
 
-    After the UPDATE the Redis stats/insights cache entries for this org are
-    deleted so the next dashboard poll picks up the new row immediately.
+    SSE events (Section 2.2) — handled inside the service:
+        Always: ``scan_complete``.
+        When quarantined: also ``quarantine_created``.
+        Pub/Sub failure → WARNING logged, task continues (non-blocking).
 
-    Finally a ``scan_complete`` SSE event is published so the frontend
-    progress bar completes and the result panel is revealed.
+    Notification counters (Section 6) — handled inside the service:
+        ``INCR notif:{user_id}:unread`` for each active org analyst.
+
+    Stats cache (Section 4.3) — invalidated here after routing so the next
+        dashboard poll reflects the outcome immediately.
 
     Retry behaviour:
         Retried up to ``max_retries=2`` (countdown=10) on unexpected exceptions.
         After exhausting retries :func:`_on_task_failure` marks the email as
-        ``'failed'`` and publishes a ``scan_complete {status:'failed'}`` event.
+        ``'failed'`` and publishes a ``scan_complete {status:'failed'}`` SSE.
 
     Args:
         email_id: UUID string of the Email row to act on.
 
     Returns:
-        *email_id*.
+        *email_id* — so further chain steps remain possible.
     """
+    import asyncio as _asyncio  # noqa: PLC0415
+
+    import redis.asyncio as _aioredis  # noqa: PLC0415
     from celery.exceptions import MaxRetriesExceededError  # noqa: PLC0415
-    from sqlalchemy import select, update  # noqa: PLC0415
+    from sqlalchemy import select  # noqa: PLC0415
 
-    from app.models.analysis_result import AnalysisResult  # noqa: PLC0415
+    from app.core.config import settings  # noqa: PLC0415
+    from app.core.database import AsyncSessionLocal  # noqa: PLC0415
     from app.models.email import Email  # noqa: PLC0415
-    from app.models.organisation import Organisation  # noqa: PLC0415
+    from app.services import quarantine_service  # noqa: PLC0415
 
-    email_uuid = uuid.UUID(email_id)
-    session = _make_sync_session()
+    async def _run() -> None:
+        """Create async session + Redis, run the service, then invalidate cache."""
+        async with AsyncSessionLocal() as db:
+            r = await _aioredis.from_url(
+                settings.REDIS_URL,
+                encoding="utf-8",
+                decode_responses=True,
+            )
+            try:
+                await quarantine_service.apply_outcome(
+                    uuid.UUID(email_id), db, r
+                )
+            finally:
+                await r.aclose()
 
-    try:
-        email = session.execute(
-            select(Email).where(Email.id == email_uuid)
-        ).scalar_one_or_none()
-        if email is None:
-            log.error("apply_outcome_email_not_found", email_id=email_id)
-            return email_id
-
-        org = session.execute(
-            select(Organisation).where(Organisation.id == email.org_id)
-        ).scalar_one_or_none()
-        auto_quarantine: bool = org.auto_quarantine_high_risk if org else True
-
-        analysis = session.execute(
-            select(AnalysisResult).where(AnalysisResult.email_id == email_uuid)
-        ).scalar_one_or_none()
-        classification: str = (analysis.classification if analysis else None) or "safe"
-        risk_score: int = analysis.risk_score if analysis else 0
-
-        # ── Determine new status ──────────────────────────────────────────────
-        if classification == "phishing" and auto_quarantine:
-            new_status = "quarantined"
-        elif classification in ("phishing", "suspicious"):
-            new_status = "flagged"
-        else:
-            new_status = "delivered"
-
-        session.execute(
-            update(Email.__table__)
-            .where(Email.__table__.c.id == email_uuid)
-            .values(status=new_status)
-        )
-        session.commit()
-
-        log.info(
-            "apply_outcome_done",
-            email_id=email_id,
-            classification=classification,
-            risk_score=risk_score,
-            new_status=new_status,
-        )
-
-        # ── Invalidate Redis stats/insights cache for this org ─────────────
+        # ── Invalidate Redis stats/insights cache (non-blocking, sync) ────
         try:
             import redis as _sync_redis  # noqa: PLC0415
 
-            from app.core.config import settings  # noqa: PLC0415
-
-            r = _sync_redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
-            for period in ("all_time", "this_week", "30d"):
-                r.delete(f"stats:{email.org_id}:{period}")
-            r.delete(f"insights:{email.org_id}")
-            r.close()
+            r_sync = _sync_redis.Redis.from_url(
+                settings.REDIS_URL, decode_responses=True
+            )
+            # Fetch org_id from DB for cache key construction.
+            # We open a fresh sync session here rather than reusing the async
+            # one (which is already closed above).
+            sync_session = _make_sync_session()
+            try:
+                email_row = sync_session.execute(
+                    select(Email).where(Email.id == uuid.UUID(email_id))
+                ).scalar_one_or_none()
+                if email_row:
+                    org_id = email_row.org_id
+                    for period in ("all_time", "this_week", "30d"):
+                        r_sync.delete(f"stats:{org_id}:{period}")
+                    r_sync.delete(f"insights:{org_id}")
+            finally:
+                sync_session.close()
+                r_sync.close()
         except Exception as cache_exc:
             log.warning(
                 "apply_outcome_cache_invalidation_failed",
@@ -964,22 +958,11 @@ def apply_outcome(self, email_id: str) -> str:
                 error=str(cache_exc),
             )
 
-        # ── Publish scan_complete SSE ─────────────────────────────────────
-        _publish_sse_event(
-            email.org_id,
-            "scan_complete",
-            {
-                "email_id": email_id,
-                "status": new_status,
-                "classification": classification,
-                "risk_score": risk_score,
-            },
-        )
-
+    try:
+        _asyncio.run(_run())
         return email_id
 
     except Exception as exc:
-        session.rollback()
         log.warning(
             "apply_outcome_error",
             email_id=email_id,
@@ -991,9 +974,6 @@ def apply_outcome(self, email_id: str) -> str:
         except MaxRetriesExceededError:
             _on_task_failure(email_id, "apply_outcome", exc)
             raise
-
-    finally:
-        session.close()
 
 
 # ---------------------------------------------------------------------------
