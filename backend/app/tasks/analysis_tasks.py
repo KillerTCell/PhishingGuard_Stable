@@ -981,20 +981,23 @@ def apply_outcome(self, email_id: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-@shared_task(queue="imap")
-def imap_poll_all_orgs() -> None:
+@shared_task(bind=True, queue="imap")
+def imap_poll_all_orgs(self) -> None:
     """Poll IMAP inboxes for all organisations with an active connector.
 
     Triggered by Celery Beat every 60 seconds (queue='imap').
 
-    For each org where ``connector_status='active'``:
+    P-02 fix: ``imap_host IS NOT NULL`` is enforced at the SQL layer so orgs
+    without IMAP configured are excluded from the query entirely.
+
+    For each org where ``connector_status='active' AND imap_host IS NOT NULL``:
 
     1. Decrypt ``imap_password_encrypted`` using the Fernet key from settings.
-    2. Open an ``IMAP4_SSL`` (port 993) or plain ``IMAP4`` (other ports) session.
+    2. Open an ``IMAP4_SSL`` session with a 10-second socket timeout.
     3. Search for ``UNSEEN`` messages.
     4. For each message — fetch raw bytes (RFC822), write to
-       ``/tmp/{email_id}.eml``, INSERT an Email row, and call
-       :func:`fire_analysis_chain`.
+       ``/tmp/{email_id}.eml``, INSERT an Email row, fire
+       :func:`fire_analysis_chain`, and PUBLISH an ``imap_ingested`` SSE.
     5. Mark fetched messages ``\\Seen`` so they are not re-processed.
     6. On *any* per-org error: UPDATE that org's ``connector_status`` to
        ``'error'``, write an ``imap_config_updated`` audit log entry, and
@@ -1016,7 +1019,10 @@ def imap_poll_all_orgs() -> None:
     try:
         orgs = list(
             session.execute(
-                select(Organisation).where(Organisation.connector_status == "active")
+                select(Organisation).where(
+                    Organisation.connector_status == "active",
+                    Organisation.imap_host.isnot(None),
+                )
             ).scalars()
         )
     except Exception as exc:
@@ -1043,12 +1049,9 @@ def imap_poll_all_orgs() -> None:
                     f"Fernet decryption failed for org {org_id_str}: {dec_exc}"
                 ) from dec_exc
 
-            # ── Connect to IMAP server ─────────────────────────────────────
+            # ── Connect to IMAP server (10 s socket timeout) ──────────────
             port: int = org.imap_port or 993
-            if port == 993:
-                conn = imaplib.IMAP4_SSL(org.imap_host, port)
-            else:
-                conn = imaplib.IMAP4(org.imap_host, port)
+            conn = imaplib.IMAP4_SSL(org.imap_host, port, timeout=10)
 
             try:
                 conn.login(org.imap_user, imap_password)
@@ -1101,6 +1104,21 @@ def imap_poll_all_orgs() -> None:
 
                         # ── Fire analysis chain ────────────────────────────
                         fire_analysis_chain(str(email_id))
+
+                        # ── Publish imap_ingested SSE ──────────────────────
+                        # sender/subject are populated later by parse_and_sanitise;
+                        # the UI uses this event to show the new row immediately.
+                        _publish_sse_event(
+                            org.id,
+                            "imap_ingested",
+                            {
+                                "email_id": str(email_id),
+                                "sender": None,
+                                "subject": None,
+                                "received_at": email_row.received_at.isoformat(),
+                                "ingestion_source": "imap",
+                            },
+                        )
 
                         # ── Mark as Seen ───────────────────────────────────
                         conn.store(msg_id, "+FLAGS", "\\Seen")
