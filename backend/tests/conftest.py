@@ -13,8 +13,19 @@ Test isolation strategy:
     join_transaction_mode="create_savepoint" and becomes a SAVEPOINT, keeping
     all writes visible within the test but never touching the outer transaction.
   - Redis uses a fresh fakeredis.aioredis.FakeRedis() per test.
+
+nest_asyncio: Celery tasks call asyncio.run() internally (for NLP pipeline and
+quarantine_service).  With task_always_eager=True, tasks run synchronously inside
+the pytest-asyncio event loop, causing "This event loop is already running".
+nest_asyncio.apply() patches asyncio to allow nested event loop execution.
 """
 from __future__ import annotations
+
+# nest_asyncio allows Celery tasks to call asyncio.run() from within the
+# pytest-asyncio running event loop (task_always_eager=True scenario).
+# Must be applied early, before any async fixtures run.
+import nest_asyncio
+nest_asyncio.apply()
 
 import uuid
 from datetime import datetime, timezone

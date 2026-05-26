@@ -395,13 +395,13 @@ async def validate_digest_token(
             detail="Digest action already taken (replayed token)",
         )
 
-    # Expiry check — 72 hours from creation
-    from datetime import datetime, timedelta, timezone
+    # Expiry check — token_expires_at stores the 72-hour deadline from sent_at
+    from datetime import datetime, timezone
 
-    created_at = digest_log.created_at
-    if created_at.tzinfo is None:
-        created_at = created_at.replace(tzinfo=timezone.utc)
-    if datetime.now(timezone.utc) - created_at > timedelta(hours=72):
+    token_expires_at = digest_log.token_expires_at
+    if token_expires_at.tzinfo is None:
+        token_expires_at = token_expires_at.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > token_expires_at:
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail="Digest token has expired (>72 hours)",
