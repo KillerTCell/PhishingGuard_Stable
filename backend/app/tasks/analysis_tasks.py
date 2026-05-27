@@ -26,8 +26,109 @@ import uuid
 
 import structlog
 from celery import shared_task
+from celery.signals import task_failure
 
 log = structlog.get_logger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Global Celery task-failure signal  (Section 9 Phase 3E)
+# ---------------------------------------------------------------------------
+
+
+@task_failure.connect
+def handle_task_failure(sender, task_id, exception, args, kwargs, **_kw) -> None:  # type: ignore[misc]
+    """Log every Celery task failure and write an audit record for classify_email.
+
+    Fires after a task raises an unhandled exception (post-retry exhaustion).
+
+    For ``classify_email`` specifically this handler also inserts an
+    ``AuditLog(action='task_failed')`` row so that operator dashboards can
+    surface model-level failures even when the task's own error path could
+    not complete (e.g. DB connection lost mid-handler).
+
+    Args:
+        sender:    The Celery task *class* (not an instance).
+        task_id:   Celery task UUID string.
+        exception: The exception instance that caused the failure.
+        args:      Positional arguments the task was called with.
+        kwargs:    Keyword arguments the task was called with.
+    """
+    task_name: str = sender.name if hasattr(sender, "name") else str(sender)
+
+    log.error(
+        "task_failed",
+        task=task_name,
+        task_id=task_id,
+        error=str(exception),
+        exc_type=type(exception).__name__,
+    )
+
+    # Extra audit-log for classify_email failures.
+    if task_name == "app.tasks.analysis_tasks.classify_email":
+        email_id_str: str | None = args[0] if args else None
+        if email_id_str:
+            _write_classify_failure_audit(email_id_str, task_id, exception)
+
+
+def _write_classify_failure_audit(
+    email_id: str, task_id: str, exception: Exception
+) -> None:
+    """Best-effort AuditLog INSERT for classify_email signal handler.
+
+    Opens its own sync session so DB errors do not propagate to the
+    Celery signal dispatcher.  Any failure is caught and logged.
+    """
+    import uuid as _uuid  # noqa: PLC0415
+
+    from app.models.audit_log import AuditLog  # noqa: PLC0415
+    from app.models.email import Email  # noqa: PLC0415
+    from sqlalchemy import select  # noqa: PLC0415
+
+    try:
+        email_uuid = _uuid.UUID(email_id)
+    except ValueError:
+        log.error(
+            "handle_task_failure_invalid_email_id",
+            email_id=email_id,
+        )
+        return
+
+    session = _make_sync_session()
+    try:
+        email_row = session.execute(
+            select(Email).where(Email.id == email_uuid)
+        ).scalar_one_or_none()
+        org_id = email_row.org_id if email_row else None
+
+        if org_id:
+            session.add(
+                AuditLog(
+                    org_id=org_id,
+                    action="task_failed",
+                    target_type="email",
+                    target_id=email_uuid,
+                    detail={
+                        "task": "classify_email",
+                        "task_id": task_id,
+                        "error": str(exception)[:500],
+                    },
+                )
+            )
+            session.commit()
+    except Exception as exc:
+        log.error(
+            "handle_task_failure_audit_error",
+            email_id=email_id,
+            error=str(exc),
+        )
+        try:
+            session.rollback()
+        except Exception:
+            pass
+    finally:
+        session.close()
+
 
 # ---------------------------------------------------------------------------
 # Module-level constants

@@ -65,8 +65,8 @@ _DMARC_VALID: frozenset[str] = frozenset({"pass", "fail", "none"})
 # ---------------------------------------------------------------------------
 
 
-class EmailParseError(Exception):
-    """Raised when both primary and fallback parsers fail to parse the email."""
+# Re-export from canonical location so existing imports remain unbroken.
+from app.core.exceptions import EmailParseError  # noqa: F401, E402
 
 
 # ---------------------------------------------------------------------------

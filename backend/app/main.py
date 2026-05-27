@@ -10,19 +10,41 @@ live settings object at module level.
 """
 from __future__ import annotations
 
+import logging
+import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 import structlog
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 from app.core.config import settings
+
+# ---------------------------------------------------------------------------
+# Structlog configuration  (Section 8 observability)
+# Must be called once at import time, before any log calls are made.
+# ---------------------------------------------------------------------------
+
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer(),
+    ],
+    wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+    context_class=dict,
+    logger_factory=structlog.PrintLoggerFactory(),
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -114,15 +136,24 @@ class CSPMiddleware:
 
 
 # ---------------------------------------------------------------------------
-# Structlog request middleware
+# Structlog request middleware  (Section 8 observability)
 # ---------------------------------------------------------------------------
 
 
 async def _structlog_request_middleware(request: Request, call_next) -> Response:  # type: ignore[type-arg]
-    """Inject request_id and path into every structlog log record.
+    """Bind request context and log request completion for every HTTP request.
 
-    Binds a UUID ``request_id`` so all log lines for one HTTP request can be
-    correlated in log aggregators.  Does NOT log the request body (privacy).
+    Binds a UUID ``request_id``, the HTTP method, and the URL path so all
+    log lines for one HTTP request can be correlated in log aggregators.
+
+    If the request carries a valid Bearer JWT the ``user_id`` and ``org_id``
+    claims are also bound — decoded without raising so unauthenticated
+    requests pass through silently.
+
+    Logs a structured ``request_complete`` line after the response is sent
+    with ``status_code`` and ``duration_ms`` (rounded to 1 decimal place).
+
+    Does NOT log the request body (privacy).
     """
     request_id = str(uuid.uuid4())
     structlog.contextvars.clear_contextvars()
@@ -131,8 +162,34 @@ async def _structlog_request_middleware(request: Request, call_next) -> Response
         method=request.method,
         path=request.url.path,
     )
+
+    # Opportunistically bind user_id + org_id from the Bearer JWT.
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            from app.core.security import decode_access_token  # noqa: PLC0415
+
+            payload = decode_access_token(auth_header[7:])
+            structlog.contextvars.bind_contextvars(
+                user_id=payload.get("sub"),
+                org_id=payload.get("org_id"),
+            )
+        except Exception:
+            pass  # Expired / invalid token — leave user_id/org_id unbound.
+
+    t0 = time.perf_counter()
     response: Response = await call_next(request)
-    structlog.contextvars.unbind_contextvars("request_id", "method", "path")
+    duration_ms = round((time.perf_counter() - t0) * 1000, 1)
+
+    logger.info(
+        "request_complete",
+        status_code=response.status_code,
+        duration_ms=duration_ms,
+    )
+
+    structlog.contextvars.unbind_contextvars(
+        "request_id", "method", "path", "user_id", "org_id"
+    )
     response.headers["X-Request-Id"] = request_id
     return response
 
@@ -146,8 +203,8 @@ def create_app() -> FastAPI:
     """Construct and return the PhishGuard FastAPI application.
 
     Registers all 14 routers under ``/api/v1``, adds middleware in the
-    correct order (outermost first), and attaches the slowapi rate-limit
-    handler.
+    correct order (outermost first), attaches the slowapi rate-limit
+    handler, and registers global exception handlers.
 
     Router prefixes match Section 4 endpoint paths exactly:
         /api/v1/auth          routers/auth.py       Section 4.1
@@ -179,6 +236,78 @@ def create_app() -> FastAPI:
     # ── Attach rate limiter state ──────────────────────────────────────────
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
+    # ── Global exception handlers (Section 9 Phase 3E) ────────────────────
+    # Registration order: most-specific first so FastAPI dispatches correctly.
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        """Pydantic / query-param validation errors → 422 JSON envelope.
+
+        Uses ``jsonable_encoder`` on the errors list so that Pydantic v2
+        ``ctx: {"error": <exception_object>}`` values are converted to
+        their string representation before JSON serialisation.
+        """
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "code": "validation_error",
+                    "message": "Request validation failed.",
+                    "details": jsonable_encoder(exc.errors()),
+                }
+            },
+        )
+
+    @app.exception_handler(HTTPException)
+    async def _http_exception_handler(
+        request: Request, exc: HTTPException
+    ) -> JSONResponse:
+        """FastAPI / Starlette HTTP exceptions → JSON envelope passthrough.
+
+        ``exc.headers`` is forwarded so that callers that explicitly attach
+        headers to their HTTPException (e.g. the login endpoint sets
+        ``Retry-After`` on its 429) see them in the response.
+        """
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": {
+                    "code": str(exc.status_code),
+                    "message": exc.detail,
+                }
+            },
+            headers=dict(exc.headers) if exc.headers else None,
+        )
+
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
+        """Catch-all for unhandled exceptions → 500 JSON envelope.
+
+        Logs the full exception at ERROR level so the stack trace is
+        captured in the structured log stream without leaking internals
+        to the API caller.
+        """
+        logger.error(
+            "unhandled_exception",
+            exc_type=type(exc).__name__,
+            error=str(exc),
+            path=request.url.path,
+            method=request.method,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "code": "internal_error",
+                    "message": "An unexpected error occurred.",
+                }
+            },
+        )
 
     # ── CORS ──────────────────────────────────────────────────────────────
     cors_origins: list[str] = [

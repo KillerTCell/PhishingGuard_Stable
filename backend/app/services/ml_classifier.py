@@ -43,13 +43,8 @@ _MODEL_PATH: Path = Path(os.environ["PHISHGUARD_MODEL_PATH"]) if "PHISHGUARD_MOD
 # ---------------------------------------------------------------------------
 
 
-class ModelNotFoundError(Exception):
-    """Raised when model.pkl does not exist at the expected path.
-
-    The ``classify_email`` Celery task catches this and retries with
-    ``countdown=30`` so that the first-deploy training race is handled
-    gracefully.
-    """
+# Re-export from canonical location so existing imports remain unbroken.
+from app.core.exceptions import ModelNotFoundError  # noqa: F401, E402
 
 
 # ---------------------------------------------------------------------------
