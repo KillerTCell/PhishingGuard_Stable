@@ -51,7 +51,7 @@ scipy==1.13.1          # last release supporting numpy 1.x; scikit-learn 1.5 nee
 scikit-learn==1.5.0
 joblib==1.4.2
 textblob==0.18.0
-anthropic==0.28.0
+anthropic==0.51.0
 
 # Observability & Quality
 structlog==24.1.0
