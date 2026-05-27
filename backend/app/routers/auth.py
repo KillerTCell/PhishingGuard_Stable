@@ -138,10 +138,15 @@ async def _send_email(to: str, subject: str, html: str) -> None:
             "subject": subject,
             "html": html,
         }
-        await asyncio.to_thread(_resend.Emails.send, params)
+        # 8-second timeout prevents nginx from closing the connection while waiting
+        # for Resend to respond (e.g. on first-send domain verification or slow network).
+        await asyncio.wait_for(
+            asyncio.to_thread(_resend.Emails.send, params),
+            timeout=8.0,
+        )
         log.info("email_sent", to=to, subject=subject)
     except Exception as exc:
-        log.error(
+        log.warning(
             "resend_email_failed",
             to=to,
             subject=subject,

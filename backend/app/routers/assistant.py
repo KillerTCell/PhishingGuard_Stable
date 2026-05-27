@@ -184,6 +184,20 @@ async def assistant_chat(
             media_type="text/event-stream",
         )
 
+    # Check LOCAL_ANSWER_MAP BEFORE calling Claude API.
+    # This ensures fast, reliable answers for common PhishGuard questions
+    # (tech stack, admin flow, SPF/DKIM, thresholds, etc.) without an API round-trip.
+    q_lower = last_user_message.lower()
+    matched_local = next(
+        (ans for kw, ans in _LOCAL_ANSWER_MAP.items() if kw in q_lower),
+        None,
+    )
+    if matched_local:
+        return StreamingResponse(
+            _stream_local(matched_local),
+            media_type="text/event-stream",
+        )
+
     # Load cached org stats to build a richer context string.  Cache miss is
     # non-fatal: the assistant still works with threshold values alone.
     org_stats: dict[str, Any] | None = None

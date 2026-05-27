@@ -2023,7 +2023,7 @@ outline-offset: 2px;
         let previousListPage = "all-emails";
         let currentEmailId = null;
         let currentDashboardRange = "week";
-        let settingsState = { suspiciousThreshold: 30, phishingThreshold: 80, autoQuarantine: true, subjectWarning: true };
+        let settingsState = { suspiciousThreshold: 30, phishingThreshold: 60, autoQuarantine: true, subjectWarning: true };
         let selectedUploadFile = null;
         let uploadTimerIds = [];
         let forwardingTimerIds = [];
@@ -2501,8 +2501,10 @@ outline-offset: 2px;
             if (!items.length) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="px-5 py-10 text-center text-slate-500 text-sm">
-                            No quarantined messages.
+                        <td colspan="5" class="px-5 py-12 text-center">
+                            <iconify-icon icon="solar:shield-check-linear" class="text-4xl text-emerald-400 block mx-auto mb-3"></iconify-icon>
+                            <p class="text-slate-700 font-medium mb-1">Queue is clear</p>
+                            <p class="text-slate-500 text-xs">No emails are currently quarantined. New threats will appear here automatically.</p>
                         </td>
                     </tr>`;
                 return;
@@ -2528,8 +2530,9 @@ outline-offset: 2px;
                     <td class="px-5 py-4 text-slate-500 text-sm whitespace-nowrap">${escapeHtml(formatReceived(email.received_at))}</td>
                     <td class="px-5 py-4 text-right">
                         <button type="button" onclick="event.stopPropagation(); openEmailDetail('${email.id}')"
-                                class="text-indigo-600 hover:text-indigo-800 font-medium text-xs px-2 py-1">
-                            Review
+                                title="Open email detail to confirm phishing, release to inbox, or escalate for investigation"
+                                class="text-indigo-600 hover:text-indigo-800 font-medium text-xs px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 transition-colors">
+                            Review →
                         </button>
                     </td>
                 </tr>
@@ -2939,12 +2942,27 @@ outline-offset: 2px;
             // Body
             document.getElementById("detail-body").textContent = email.body_text || "(no content)";
 
-            // Auth headers
+            // Auth headers — map backend values (pass/fail/none/softfail/neutral) to labels + colours.
+            // null or 'none' → grey "None" (not an error, just no header); 'pass' → green; 'fail'/'softfail' → red.
             ["spf", "dkim", "dmarc"].forEach(key => {
                 const el  = document.getElementById(`detail-${key}`);
-                const val = (email[key] || "unknown").toUpperCase();
-                el.textContent = val;
-                el.className   = `text-sm font-semibold ${getHeaderClass(val)}`;
+                const raw = (email[key] || "").toLowerCase().trim();
+                let label, cssClass;
+                if (!raw || raw === "none") {
+                    label = "None";      cssClass = "text-slate-400";
+                } else if (raw === "pass") {
+                    label = "Pass";      cssClass = "text-emerald-600";
+                } else if (raw === "fail") {
+                    label = "Fail";      cssClass = "text-rose-600";
+                } else if (raw === "softfail") {
+                    label = "Soft Fail"; cssClass = "text-amber-500";
+                } else if (raw === "neutral") {
+                    label = "Neutral";   cssClass = "text-slate-500";
+                } else {
+                    label = capitalize(raw); cssClass = "text-slate-500";
+                }
+                el.textContent = label;
+                el.className   = `text-sm font-semibold ${cssClass}`;
             });
 
             const score = email.risk_score ?? 0;
@@ -3441,34 +3459,78 @@ outline-offset: 2px;
         // DATA EXPORT
         // =====================================================
 
+        // Download an export file via apiFetch so the Authorization header is sent.
+        // Direct <a href> links won't work because JWT auth requires a header, not a cookie.
+        async function downloadExport(jobId, format) {
+            try {
+                const resp = await apiFetch(`/settings/export/${jobId}`);
+                if (!resp.ok) { showAppMessage("Export file could not be downloaded."); return; }
+                const blob = await resp.blob();
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                a.href     = url;
+                a.download = `phishguard-export.${format || 'csv'}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (_) { showAppMessage("Download failed. Try again."); }
+        }
+
         async function renderDataExport() {
             // Clear scope counts — will be populated when an export is generated.
             // The POST /settings/export response returns estimated_scope.
             if (currentExportJobId) {
                 // Poll status of the last export job.
+                // GET /settings/export/{id} returns JSON (pending/generating/failed)
+                // OR a binary FileResponse (ready). Check Content-Type to distinguish.
                 try {
                     const pollResp = await apiFetch(`/settings/export/${currentExportJobId}`);
                     if (pollResp.ok) {
-                        const job = await pollResp.json();
-                        if (job.estimated_scope) {
-                            setText("export-scope-emails",   formatNumber(job.estimated_scope.emails));
-                            setText("export-scope-phishing", formatNumber(job.estimated_scope.phishing));
-                            setText("export-scope-safe",     formatNumber(job.estimated_scope.safe));
-                            setText("export-scope-review",   formatNumber(job.estimated_scope.review));
-                        }
+                        const contentType = pollResp.headers.get('content-type') || '';
                         const hbody = document.getElementById("export-history-body");
-                        if (hbody && job.status) {
-                            const statusClass = job.status === "ready" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-indigo-50 text-indigo-700 border border-indigo-100";
-                            hbody.innerHTML = `
-                                <tr>
-                                    <td class="px-5 py-3 text-slate-500">${job.created_at ? new Date(job.created_at).toLocaleString() : "—"}</td>
-                                    <td class="px-5 py-3 font-medium text-slate-900">${escapeHtml((job.format || "").toUpperCase())}</td>
-                                    <td class="px-5 py-3">${formatNumber(job.estimated_scope?.emails ?? 0)}</td>
-                                    <td class="px-5 py-3 flex items-center gap-2">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${statusClass}">${capitalize(job.status)}</span>
-                                        ${job.status === 'ready' ? `<a href="${API_BASE}/settings/export/${currentExportJobId}" class="text-indigo-600 hover:underline text-xs font-medium">Download</a>` : ''}
-                                    </td>
-                                </tr>`;
+                        if (!contentType.includes('application/json')) {
+                            // Binary FileResponse — job is ready, file is downloadable.
+                            if (hbody) {
+                                const cfg = getExportConfig();
+                                hbody.innerHTML = `
+                                    <tr>
+                                        <td class="px-5 py-3 text-slate-500">${new Date().toLocaleString()}</td>
+                                        <td class="px-5 py-3 font-medium text-slate-900">${escapeHtml(cfg.format.toUpperCase())}</td>
+                                        <td class="px-5 py-3">—</td>
+                                        <td class="px-5 py-3 flex items-center gap-2">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">Ready</span>
+                                            <button type="button" onclick="downloadExport('${currentExportJobId}', '${cfg.format}')"
+                                                class="text-indigo-600 hover:text-indigo-800 hover:underline text-xs font-medium">Download</button>
+                                        </td>
+                                    </tr>`;
+                            }
+                        } else {
+                            const job = await pollResp.json();
+                            if (job.estimated_scope) {
+                                setText("export-scope-emails",   formatNumber(job.estimated_scope.emails));
+                                setText("export-scope-phishing", formatNumber(job.estimated_scope.phishing));
+                                setText("export-scope-safe",     formatNumber(job.estimated_scope.safe));
+                                setText("export-scope-review",   formatNumber(job.estimated_scope.review));
+                            }
+                            if (hbody && job.status) {
+                                const isReady   = job.status === "ready";
+                                const isFailed  = job.status === "failed";
+                                const statusClass = isReady  ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                                : isFailed ? "bg-rose-50 text-rose-700 border border-rose-100"
+                                                            : "bg-indigo-50 text-indigo-700 border border-indigo-100";
+                                const cfg = getExportConfig();
+                                hbody.innerHTML = `
+                                    <tr>
+                                        <td class="px-5 py-3 text-slate-500">${job.created_at ? new Date(job.created_at).toLocaleString() : "—"}</td>
+                                        <td class="px-5 py-3 font-medium text-slate-900">${escapeHtml((job.format || "").toUpperCase())}</td>
+                                        <td class="px-5 py-3">${formatNumber(job.estimated_scope?.emails ?? 0)}</td>
+                                        <td class="px-5 py-3 flex items-center gap-2">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${statusClass}">${capitalize(job.status)}</span>
+                                            ${isReady ? `<button type="button" onclick="downloadExport('${currentExportJobId}', '${cfg.format}')" class="text-indigo-600 hover:underline text-xs font-medium">Download</button>` : ''}
+                                        </td>
+                                    </tr>`;
+                            }
                         }
                     }
                 } catch (_) {}
@@ -3618,9 +3680,16 @@ outline-offset: 2px;
                             </td>
                             <td class="px-5 py-3 text-slate-500">${escapeHtml(user.lastActive)}</td>
                             <td class="px-5 py-3 text-right">
-                                <button type="button" onclick="requestDeactivateUser('${user.id}')"
-                                    class="text-rose-600 hover:text-rose-800 font-medium text-xs px-2 py-1 disabled:text-slate-300 disabled:cursor-not-allowed"
-                                    ${user.status === "Inactive" || user.email === currentUser.email ? "disabled" : ""}>Deactivate</button>
+                                ${user.status === "Active"
+                                    ? `<button type="button" onclick="requestDeactivateUser('${user.id}')"
+                                            title="Disable this user's access"
+                                            class="text-rose-600 hover:text-rose-800 font-medium text-xs px-2 py-1 disabled:text-slate-300 disabled:cursor-not-allowed"
+                                            ${user.email === currentUser.email ? "disabled" : ""}>Deactivate</button>`
+                                    : `<button type="button" onclick="requestReactivateUser('${user.id}')"
+                                            title="Restore this user's access"
+                                            class="text-emerald-600 hover:text-emerald-800 font-medium text-xs px-2 py-1"
+                                            ${user.email === currentUser.email ? "disabled" : ""}>Reactivate</button>`
+                                }
                             </td>
                         </tr>
                     `).join("");
@@ -3736,6 +3805,32 @@ outline-offset: 2px;
                 renderUserManagement();
             } catch (_) {
                 setUserManagementStatus("Deactivation failed. Check your connection.", "error");
+            }
+        }
+
+        function requestReactivateUser(userId) {
+            const user = systemUsersState.find(item => item.id === userId);
+            if (!user) return;
+            setUserManagementStatus(`
+                <span class="block mb-3">Reactivate ${escapeHtml(user.name)}?</span>
+                <span class="inline-flex gap-2">
+                    <button type="button" onclick="confirmReactivateUser('${userId}')" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-emerald-700 transition-colors">Confirm</button>
+                    <button type="button" onclick="setUserManagementStatus('Reactivation cancelled.', 'info')" class="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors">Cancel</button>
+                </span>
+            `, "info", true);
+        }
+
+        async function confirmReactivateUser(userId) {
+            try {
+                const resp = await apiFetch(`/users/${userId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ is_active: true }),
+                });
+                if (!resp.ok) { setUserManagementStatus("User could not be reactivated.", "error"); return; }
+                setUserManagementStatus("User reactivated.", "success");
+                renderUserManagement();
+            } catch (_) {
+                setUserManagementStatus("Reactivation failed. Check your connection.", "error");
             }
         }
 

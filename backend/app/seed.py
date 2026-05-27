@@ -129,7 +129,7 @@ async def seed() -> None:
             id=org_id,
             name="Demo University",
             suspicious_threshold=30,
-            phishing_threshold=80,
+            phishing_threshold=60,
             auto_quarantine_high_risk=True,
             prepend_subject_warning=True,
             connector_status="unconfigured",
@@ -389,7 +389,7 @@ async def seed() -> None:
             risk_score=94,
             model_version=_MODEL_VERSION,
             threshold_applied_suspicious=30,
-            threshold_applied_phishing=80,
+            threshold_applied_phishing=60,
             explanation=(
                 "This email exhibits multiple high-confidence phishing indicators: "
                 "the sender domain (paypa1-secure.ru) impersonates PayPal using a "
@@ -409,7 +409,7 @@ async def seed() -> None:
             risk_score=88,
             model_version=_MODEL_VERSION,
             threshold_applied_suspicious=30,
-            threshold_applied_phishing=80,
+            threshold_applied_phishing=60,
             explanation=(
                 "This is a business email compromise (BEC) attempt impersonating the "
                 "Vice-Chancellor. The sender domain (demo-edu.net) differs from the "
@@ -429,7 +429,7 @@ async def seed() -> None:
             risk_score=4,
             model_version=_MODEL_VERSION,
             threshold_applied_suspicious=30,
-            threshold_applied_phishing=80,
+            threshold_applied_phishing=60,
             explanation=(
                 "This email originates from an authenticated internal domain with "
                 "passing SPF, DKIM, and DMARC records. The content is a routine IT "
@@ -448,7 +448,7 @@ async def seed() -> None:
             risk_score=2,
             model_version=_MODEL_VERSION,
             threshold_applied_suspicious=30,
-            threshold_applied_phishing=80,
+            threshold_applied_phishing=60,
             explanation=(
                 "Transactional confirmation email from a known academic conference "
                 "body (acm.org) with full email authentication passing. No phishing "
@@ -466,7 +466,7 @@ async def seed() -> None:
             risk_score=52,
             model_version=_MODEL_VERSION,
             threshold_applied_suspicious=30,
-            threshold_applied_phishing=80,
+            threshold_applied_phishing=60,
             explanation=(
                 "This email uses urgency language ('limited time', 'act now') and "
                 "requests the recipient to enter their institutional email address on "
