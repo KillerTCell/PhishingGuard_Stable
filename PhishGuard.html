@@ -1816,8 +1816,17 @@ outline-offset: 2px;
         // API / SERVICE PLACEHOLDERS
         // =====================================================
 
-        // Set API_BASE_URL to the deployed backend URL when production backend is ready.
-        const API_BASE_URL = "";
+        // Base URL for all API calls. Points to the nginx TLS proxy in front of the
+        // FastAPI backend. Change to the Railway public URL before production deploy.
+        const API_BASE_URL = "https://localhost";
+
+        // Helper: build fetch headers that always include the Bearer token (when present)
+        // and mark the request as JSON. Pass an extra object to merge additional headers.
+        function authHeaders(extra) {
+            const h = { 'Content-Type': 'application/json' };
+            if (window.authToken) h['Authorization'] = `Bearer ${window.authToken}`;
+            return Object.assign(h, extra || {});
+        }
 
         // Production readiness notes:
         // - Real authentication must be handled server-side.
@@ -1844,20 +1853,56 @@ outline-offset: 2px;
         // TODO: Add backend audit logging for privileged actions.
 
         async function loginUser(credentials) {
-            // Temporary frontend demo login only.
-            // Replace this with POST /api/auth/login before production.
-            // Real passwords must never be stored in frontend code.
-            await wait(350);
-            const allUsers = [...DEMO_USERS, ...sessionUsers];
-            return allUsers.find(user =>
-                user.email.toLowerCase() === credentials.email.toLowerCase() &&
-                user.password === credentials.password
-            ) || null;
+            // POST /api/v1/auth/login — real backend authentication.
+            // Returns a user object on success, or { _error: '<code>' } on failure.
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+                    method: 'POST',
+                    credentials: 'include',           // send/receive the refresh_token cookie
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: credentials.email, password: credentials.password }),
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    window.authToken = data.access_token;   // store globally for subsequent calls
+                    // Backend role is lowercase ("admin" / "analyst"); frontend guards compare
+                    // against "Admin" / "Analyst" — capitalise first letter to match.
+                    const role = data.role
+                        ? data.role.charAt(0).toUpperCase() + data.role.slice(1)
+                        : 'Analyst';
+                    return {
+                        role,
+                        email: credentials.email,
+                        // Derive a display name from the email local-part until a /users/me
+                        // call is wired up (e.g. "admin" → "Admin").
+                        name: credentials.email.split('@')[0]
+                            .replace(/[._-]/g, ' ')
+                            .replace(/\b\w/g, c => c.toUpperCase()),
+                        org_id:   data.org_id,
+                        org_name: data.org_name,
+                    };
+                }
+                if (resp.status === 401) return { _error: 'invalid_credentials' };
+                if (resp.status === 403) return { _error: 'inactive' };
+                if (resp.status === 429) return { _error: 'rate_limited' };
+                return { _error: 'server_error' };
+            } catch (err) {
+                console.error('[loginUser] network error:', err);
+                return { _error: 'network_error' };
+            }
         }
 
         async function logoutUser() {
-            // Future endpoint: POST /api/auth/logout
-            await wait(150);
+            // POST /api/v1/auth/logout — blacklists the refresh token JTI server-side
+            // and clears the HttpOnly refresh_token cookie.
+            try {
+                await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: authHeaders(),
+                });
+            } catch (_) { /* best-effort; always clear local state */ }
+            window.authToken = null;
             return { ok: true };
         }
 
@@ -2282,12 +2327,25 @@ outline-offset: 2px;
             button.disabled  = false;
             button.innerHTML = originalText;
 
-            if (!user) {
-                showFormError("login-error", "Invalid email or password.");
-                setInputInvalid("login-email", true);
-                setInputInvalid("login-password", true);
-                passwordInput.value = "";
-                passwordInput.focus();
+            // Handle structured error codes returned by the real API call
+            if (!user || user._error) {
+                const ERROR_MESSAGES = {
+                    invalid_credentials: "Invalid email or password.",
+                    inactive:            "Account is inactive.",
+                    rate_limited:        "Too many attempts. Try again in 15 minutes.",
+                    network_error:       "Unable to reach the server. Check your connection.",
+                    server_error:        "An unexpected error occurred. Please try again.",
+                };
+                const msg = user ? (ERROR_MESSAGES[user._error] || "Login failed.") : "Invalid email or password.";
+                showFormError("login-error", msg);
+                // Only mark fields invalid for a credential mismatch; leave them clean for
+                // rate-limit / inactive / network errors so the user isn't confused.
+                if (!user || user._error === 'invalid_credentials') {
+                    setInputInvalid("login-email",    true);
+                    setInputInvalid("login-password", true);
+                    passwordInput.value = "";
+                    passwordInput.focus();
+                }
                 return;
             }
 
