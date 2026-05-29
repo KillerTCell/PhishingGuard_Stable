@@ -73,5 +73,13 @@ class Settings(BaseSettings):
     EXPORT_VOLUME_PATH: str = "/mnt/exports"
     """Absolute path to the Docker volume where generated CSV exports live."""
 
+    ENVIRONMENT: str = "development"
+    """Runtime environment: 'development' | 'production'.
+
+    Controls security-sensitive behaviour that differs between local dev and prod:
+      - Cookie Secure flag: False in development (allows HTTP localhost), True in production.
+      - Set ENVIRONMENT=production in Railway environment variables before deploying.
+    """
+
 
 settings = Settings()  # type: ignore[call-arg]  # pydantic-settings reads required fields from env vars at runtime

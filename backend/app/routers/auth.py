@@ -83,21 +83,35 @@ _INVITE_TTL_HOURS = 48
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:
-    """Set the refresh token as HttpOnly Secure SameSite=Strict cookie (NFR-2).
+    """Set the refresh token as HttpOnly SameSite=Lax cookie (NFR-2).
 
     Path is scoped to ``/api/v1/auth`` so the cookie is only transmitted to
     auth endpoints and never sent with API data requests.
+
+    SameSite=Lax (not Strict) is required for local development where the
+    frontend is served over http://localhost:3000 and the backend is at
+    https://localhost — Chrome 86+ schemeful same-site treats these as
+    cross-site, and SameSite=Strict would prevent the cookie from being sent
+    on the POST /auth/refresh call, breaking session restore on page refresh.
+    SameSite=Lax is safe for production: it still blocks CSRF on cross-site
+    POST requests originating from third-party pages.
+
+    The Secure flag is False in development (ENVIRONMENT=development) so the
+    cookie is accessible when the frontend is served over plain HTTP.  In
+    production (ENVIRONMENT=production) Secure=True is reinstated — Railway
+    always serves over HTTPS.
 
     Args:
         response: FastAPI Response object for the current request.
         token:    Encoded refresh JWT string.
     """
+    is_production = settings.ENVIRONMENT == "production"
     response.set_cookie(
         key=_REFRESH_COOKIE,
         value=token,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=is_production,
+        samesite="lax",
         max_age=_REFRESH_TTL_DAYS * 86_400,
         path="/api/v1/auth",
     )

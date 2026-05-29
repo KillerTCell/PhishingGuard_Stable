@@ -1,5 +1,18 @@
 # Session Persistence — Railway Deployment Notes
 
+## Critical: Railway environment variable required
+
+Before deploying to Railway, set this environment variable:
+
+```
+ENVIRONMENT=production
+```
+
+Without it, the refresh token cookie will have `Secure=False`, which is
+intentional for local HTTP development but wrong for HTTPS production.
+
+---
+
 ## Problem
 
 Before this change, every browser refresh forced the user back to the
@@ -126,3 +139,51 @@ The warning always appears `WARNING_BEFORE_MS` (1 minute) before the logout fire
 ### Railway impact
 
 None — frontend only. Works identically in local Docker and Railway production.
+
+---
+
+## Cookie fix — SameSite=Lax (added 2026-05-30)
+
+### Root cause of "session restore not working on page refresh"
+
+The refresh token cookie was set with `SameSite=Strict` and `Secure=True`.
+
+Chrome 86+ introduced **schemeful same-site**: `http://localhost:3000`
+(frontend) and `https://localhost:443` (nginx backend) are treated as
+**different sites** because their schemes differ (`http` vs `https`).
+
+With `SameSite=Strict` + schemeful same-site:
+- `POST /auth/refresh` from `http://localhost:3000` to `https://localhost`
+  is treated as a cross-site request
+- `SameSite=Strict` never sends cookies on cross-site requests
+- The backend receives no cookie → returns 401
+- `tryRestoreSession()` returns `false` → login page is shown
+
+### Fix applied
+
+`backend/app/routers/auth.py` — `_set_refresh_cookie()`:
+- `samesite="strict"` → `samesite="lax"` (works across port and scheme on localhost)
+- `secure=True` → `secure=is_production` (False in dev, True in prod)
+
+`backend/app/core/config.py`:
+- Added `ENVIRONMENT: str = "development"` setting
+
+### Why SameSite=Lax is safe in production
+
+`SameSite=Lax` still blocks CSRF on cross-site `POST` requests from
+third-party pages. The only scenario where Lax is weaker than Strict is
+cross-site top-level GET navigation (clicking a link from an external site).
+The `/auth/refresh` endpoint is `POST`-only, so it is not affected.
+
+### Railway deployment step
+
+Set the environment variable before deploying:
+```
+ENVIRONMENT=production
+```
+
+This makes the cookie `Secure=True` in production (required for HTTPS,
+which Railway provides automatically).
+
+Without `ENVIRONMENT=production`, the cookie will have `Secure=False` in
+production, which still works over HTTPS but is not best practice.
