@@ -762,14 +762,14 @@ outline-offset: 2px;
                                     <h2 class="text-lg font-semibold tracking-tight text-slate-900">System users</h2>
                                 </div>
                                 <div class="overflow-x-auto">
-                                    <table class="w-full text-left border-collapse min-w-[760px]">
+                                    <table class="w-full text-left border-collapse min-w-[960px]">
                                         <thead>
                                             <tr class="bg-slate-50/50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
                                                 <th scope="col" class="px-5 py-3">User</th>
                                                 <th scope="col" class="px-5 py-3">Role</th>
                                                 <th scope="col" class="px-5 py-3">Status</th>
                                                 <th scope="col" class="px-5 py-3">Last Active</th>
-                                                <th scope="col" class="px-5 py-3 text-right">Action</th>
+                                                <th scope="col" class="px-5 py-3">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody id="system-users-body" class="divide-y divide-slate-100 text-sm"></tbody>
@@ -3776,6 +3776,93 @@ outline-offset: 2px;
         // USER MANAGEMENT
         // =====================================================
 
+        // ─── Build a single user table row ───────────────────────────
+        // Extracted so confirmToggleUser can replace one row in-place
+        // without a full re-render of the entire table.
+        function buildUserRow(user) {
+            const isSelf   = user.email === currentUser?.email;
+            const isActive = user.status === 'Active';
+            const isInvited = user.status === 'Invited';
+
+            // Status badge (spec: specific colours + pill shape)
+            const statusBadge = isActive
+                ? `<span style="background:#dcfce7;color:#16a34a;border-radius:20px;padding:2px 10px;font-size:12px;display:inline-block;font-weight:500">Active</span>`
+                : isInvited
+                ? `<span style="background:#e0e7ff;color:#4338ca;border-radius:20px;padding:2px 10px;font-size:12px;display:inline-block;font-weight:500">Invited</span>`
+                : `<span style="background:#f3f4f6;color:#6b7280;border-radius:20px;padding:2px 10px;font-size:12px;display:inline-block;font-weight:500">Inactive</span>`;
+
+            // Role badge (read-only display column)
+            const roleBadge = user.role === 'Admin'
+                ? `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">Admin</span>`
+                : `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">Analyst</span>`;
+
+            // Role dropdown (in ACTIONS column)
+            const roleDropdown = `
+                <label for="role-${user.id}" class="sr-only">Change role for ${escapeHtml(user.name)}</label>
+                <select id="role-${user.id}" onchange="handleUserRoleChange('${user.id}', this.value)"
+                    style="padding:4px 8px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;cursor:${isSelf ? 'not-allowed' : 'pointer'};outline:none"
+                    ${isSelf ? 'disabled title="You cannot change your own role"' : ''}>
+                    <option value="Admin"   ${user.role === 'Admin'   ? 'selected' : ''}>Admin</option>
+                    <option value="Analyst" ${user.role === 'Analyst' ? 'selected' : ''}>Analyst</option>
+                </select>`;
+
+            // Deactivate / Reactivate button
+            let toggleBtn = '';
+            if (isSelf) {
+                // Self: show disabled Deactivate if currently active
+                if (isActive) {
+                    toggleBtn = `<button type="button" disabled
+                        title="You cannot deactivate your own account"
+                        style="opacity:0.4;cursor:not-allowed;color:#dc2626;font-weight:500;font-size:12px;padding:4px 8px;background:transparent;border:none">Deactivate</button>`;
+                }
+            } else if (isActive) {
+                toggleBtn = `<button type="button" onclick="requestToggleUser('${user.id}', false)"
+                    title="Disable this user's access"
+                    style="color:#dc2626;font-weight:500;font-size:12px;padding:4px 8px;background:transparent;border:none;cursor:pointer"
+                    onmouseover="this.style.color='#9b1c1c'" onmouseout="this.style.color='#dc2626'">Deactivate</button>`;
+            } else {
+                toggleBtn = `<button type="button" onclick="requestToggleUser('${user.id}', true)"
+                    title="Restore this user's access"
+                    style="color:#16a34a;font-weight:500;font-size:12px;padding:4px 8px;background:transparent;border:none;cursor:pointer"
+                    onmouseover="this.style.color='#14532d'" onmouseout="this.style.color='#16a34a'">Reactivate</button>`;
+            }
+
+            // Delete button (red bin icon)
+            const deleteBtn = isSelf
+                ? `<button type="button" disabled
+                    title="You cannot delete your own account"
+                    aria-label="Delete user (unavailable)"
+                    style="opacity:0.4;cursor:not-allowed;background:transparent;border:1px solid #ef4444;color:#ef4444;border-radius:6px;padding:6px 8px;font-size:14px;line-height:1">🗑</button>`
+                : `<button type="button" onclick="requestDeleteUser('${user.id}')"
+                    title="Delete user"
+                    aria-label="Delete ${escapeHtml(user.name)}"
+                    style="background:transparent;border:1px solid #ef4444;color:#ef4444;border-radius:6px;padding:6px 8px;font-size:14px;line-height:1;cursor:pointer"
+                    onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='transparent'">🗑</button>`;
+
+            return `
+                <tr id="user-row-${user.id}" class="hover:bg-slate-50/50 transition-colors">
+                    <th scope="row" class="px-5 py-3 font-medium text-slate-900">
+                        <div>${escapeHtml(user.name)}</div>
+                        <div class="text-xs text-slate-500 font-normal mt-0.5">${escapeHtml(user.email)}</div>
+                    </th>
+                    <td class="px-5 py-3">${roleBadge}</td>
+                    <td class="px-5 py-3">${statusBadge}</td>
+                    <td class="px-5 py-3 text-slate-500 text-sm">${escapeHtml(user.lastActive)}</td>
+                    <td class="px-5 py-3" style="min-width:220px">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap">
+                            ${roleDropdown}
+                            ${toggleBtn}
+                            ${deleteBtn}
+                        </div>
+                    </td>
+                </tr>`;
+        }
+
+        // Remove any open inline confirmation row (only one can be open at a time).
+        function closeOpenConfirm() {
+            document.querySelectorAll('.user-confirm-row').forEach(r => r.remove());
+        }
+
         async function renderUserManagement() {
             if (currentUser?.role !== "Admin") {
                 navigate("home");
@@ -3800,7 +3887,6 @@ outline-offset: 2px;
             if (usersResp.status === 'fulfilled' && usersResp.value.ok) {
                 const data  = await usersResp.value.json();
                 const users = data.items || data;
-                // Cache locally so requestDeactivateUser can look up names.
                 systemUsersState = users.map(u => ({
                     id:         u.id,
                     name:       u.full_name,
@@ -3812,43 +3898,7 @@ outline-offset: 2px;
 
                 const tableBody = document.getElementById("system-users-body");
                 if (tableBody) {
-                    tableBody.innerHTML = systemUsersState.map(user => `
-                        <tr>
-                            <th scope="row" class="px-5 py-3 font-medium text-slate-900">
-                                <div>${escapeHtml(user.name)}</div>
-                                <div class="text-xs text-slate-500 font-normal mt-0.5">${escapeHtml(user.email)}</div>
-                            </th>
-                            <td class="px-5 py-3">
-                                <label for="role-${user.id}" class="sr-only">Role for ${escapeHtml(user.name)}</label>
-                                <select id="role-${user.id}" onchange="handleUserRoleChange('${user.id}', this.value)"
-                                    class="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                    ${user.email === currentUser.email ? "disabled" : ""}>
-                                    <option value="Admin"   ${user.role === "Admin"   ? "selected" : ""}>Admin</option>
-                                    <option value="Analyst" ${user.role === "Analyst" ? "selected" : ""}>Analyst</option>
-                                </select>
-                            </td>
-                            <td class="px-5 py-3">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
-                                    user.status === "Active"   ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
-                                    user.status === "Invited"  ? "bg-indigo-50 text-indigo-700 border border-indigo-100" :
-                                                                 "bg-slate-100 text-slate-600 border border-slate-200"
-                                }">${escapeHtml(user.status)}</span>
-                            </td>
-                            <td class="px-5 py-3 text-slate-500">${escapeHtml(user.lastActive)}</td>
-                            <td class="px-5 py-3 text-right">
-                                ${user.status === "Active"
-                                    ? `<button type="button" onclick="requestDeactivateUser('${user.id}')"
-                                            title="Disable this user's access"
-                                            class="text-rose-600 hover:text-rose-800 font-medium text-xs px-2 py-1 disabled:text-slate-300 disabled:cursor-not-allowed"
-                                            ${user.email === currentUser.email ? "disabled" : ""}>Deactivate</button>`
-                                    : `<button type="button" onclick="requestReactivateUser('${user.id}')"
-                                            title="Restore this user's access"
-                                            class="text-emerald-600 hover:text-emerald-800 font-medium text-xs px-2 py-1"
-                                            ${user.email === currentUser.email ? "disabled" : ""}>Reactivate</button>`
-                                }
-                            </td>
-                        </tr>
-                    `).join("");
+                    tableBody.innerHTML = systemUsersState.map(u => buildUserRow(u)).join('');
                 }
             }
 
@@ -3913,7 +3963,6 @@ outline-offset: 2px;
                     body: JSON.stringify({ email, role: role.toLowerCase() }),
                 });
                 if (resp.status === 200 || resp.status === 201) {
-                    // Clear all three form fields
                     if (nameInput)  nameInput.value = '';
                     emailInput.value = '';
                     roleInput.value  = '';
@@ -3928,8 +3977,6 @@ outline-offset: 2px;
             } catch (_) {
                 setUserManagementStatus("Invite failed. Check your connection.", "error");
             }
-            // Refresh user list outside the try/catch so a render error cannot
-            // overwrite the success message shown above.
             if (succeeded) renderUserManagement();
         }
 
@@ -3940,63 +3987,131 @@ outline-offset: 2px;
                     body: JSON.stringify({ role: role.toLowerCase() }),
                 });
                 if (!resp.ok) { setUserManagementStatus("Role could not be updated.", "error"); return; }
+                // Update state and badge in-place
+                const idx = systemUsersState.findIndex(u => u.id === userId);
+                if (idx !== -1) {
+                    systemUsersState[idx].role = capitalize(role);
+                    const oldRow = document.getElementById(`user-row-${userId}`);
+                    if (oldRow) {
+                        const tmp = document.createElement('tbody');
+                        tmp.innerHTML = buildUserRow(systemUsersState[idx]);
+                        oldRow.replaceWith(tmp.firstElementChild);
+                    }
+                }
                 setUserManagementStatus("Role updated.", "success");
-                renderUserManagement();
             } catch (_) {
                 setUserManagementStatus("Role update failed. Check your connection.", "error");
             }
         }
 
-        function requestDeactivateUser(userId) {
-            const user = systemUsersState.find(item => item.id === userId);
+        // ─── Deactivate / Reactivate (inline confirmation) ────────────
+        function requestToggleUser(userId, activate) {
+            const user = systemUsersState.find(u => u.id === userId);
             if (!user) return;
-            if (user.email === currentUser.email) {
-                setUserManagementStatus("You cannot deactivate your own account.", "error");
-                return;
-            }
-            setUserManagementStatus(`
-                <span class="block mb-3">Deactivate ${escapeHtml(user.name)}?</span>
-                <span class="inline-flex gap-2">
-                    <button type="button" onclick="confirmDeactivateUser('${userId}')" class="bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-rose-700 transition-colors">Confirm</button>
-                    <button type="button" onclick="setUserManagementStatus('Deactivation cancelled.', 'info')" class="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors">Cancel</button>
-                </span>
-            `, "info", true);
+            // Close any other open confirmation first
+            closeOpenConfirm();
+
+            const action   = activate ? 'Reactivate' : 'Deactivate';
+            const bgColor  = activate ? '#f0fdf4' : '#fefce8';
+            const border   = activate ? '#bbf7d0' : '#fde68a';
+            const btnColor = activate ? '#16a34a' : '#dc2626';
+
+            const confirmRow = document.createElement('tr');
+            confirmRow.className = 'user-confirm-row';
+            confirmRow.innerHTML = `
+                <td colspan="5" style="padding:6px 20px">
+                    <div style="background:${bgColor};border:1px solid ${border};border-radius:8px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between">
+                        <span style="font-size:13px;color:#374151">
+                            ${action} <strong>${escapeHtml(user.name)}</strong>? (${escapeHtml(user.email)})
+                        </span>
+                        <div style="display:flex;gap:8px">
+                            <button type="button" onclick="closeOpenConfirm()"
+                                style="border:1px solid #e5e7eb;background:#fff;color:#374151;padding:5px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500">Cancel</button>
+                            <button type="button" onclick="confirmToggleUser('${userId}', ${activate})"
+                                style="background:${btnColor};color:#fff;padding:5px 14px;border-radius:6px;font-size:12px;cursor:pointer;border:none;font-weight:500">Confirm</button>
+                        </div>
+                    </div>
+                </td>`;
+
+            const userRow = document.getElementById(`user-row-${userId}`);
+            if (userRow) userRow.insertAdjacentElement('afterend', confirmRow);
         }
 
-        async function confirmDeactivateUser(userId) {
-            try {
-                const resp = await apiFetch(`/users/${userId}`, { method: 'DELETE' });
-                if (!resp.ok) { setUserManagementStatus("User could not be deactivated.", "error"); return; }
-                setUserManagementStatus("User deactivated.", "success");
-                renderUserManagement();
-            } catch (_) {
-                setUserManagementStatus("Deactivation failed. Check your connection.", "error");
-            }
-        }
-
-        function requestReactivateUser(userId) {
-            const user = systemUsersState.find(item => item.id === userId);
-            if (!user) return;
-            setUserManagementStatus(`
-                <span class="block mb-3">Reactivate ${escapeHtml(user.name)}?</span>
-                <span class="inline-flex gap-2">
-                    <button type="button" onclick="confirmReactivateUser('${userId}')" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-emerald-700 transition-colors">Confirm</button>
-                    <button type="button" onclick="setUserManagementStatus('Reactivation cancelled.', 'info')" class="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors">Cancel</button>
-                </span>
-            `, "info", true);
-        }
-
-        async function confirmReactivateUser(userId) {
+        async function confirmToggleUser(userId, activate) {
+            closeOpenConfirm();
             try {
                 const resp = await apiFetch(`/users/${userId}`, {
                     method: 'PATCH',
-                    body: JSON.stringify({ is_active: true }),
+                    body: JSON.stringify({ is_active: activate }),
                 });
-                if (!resp.ok) { setUserManagementStatus("User could not be reactivated.", "error"); return; }
-                setUserManagementStatus("User reactivated.", "success");
-                renderUserManagement();
+                if (!resp.ok) {
+                    setUserManagementStatus(`Could not ${activate ? 'reactivate' : 'deactivate'} user.`, 'error');
+                    return;
+                }
+                // Update state and rebuild this row in-place (no full re-render)
+                const idx = systemUsersState.findIndex(u => u.id === userId);
+                if (idx !== -1) {
+                    systemUsersState[idx].status = activate ? 'Active' : 'Inactive';
+                    const oldRow = document.getElementById(`user-row-${userId}`);
+                    if (oldRow) {
+                        const tmp = document.createElement('tbody');
+                        tmp.innerHTML = buildUserRow(systemUsersState[idx]);
+                        oldRow.replaceWith(tmp.firstElementChild);
+                    }
+                }
+                setUserManagementStatus(`User ${activate ? 'reactivated' : 'deactivated'}.`, 'success');
             } catch (_) {
-                setUserManagementStatus("Reactivation failed. Check your connection.", "error");
+                setUserManagementStatus('Action failed. Check your connection.', 'error');
+            }
+        }
+
+        // ─── Delete user (inline confirmation + fade-out) ─────────────
+        function requestDeleteUser(userId) {
+            const user = systemUsersState.find(u => u.id === userId);
+            if (!user) return;
+            closeOpenConfirm();
+
+            const confirmRow = document.createElement('tr');
+            confirmRow.className = 'user-confirm-row';
+            confirmRow.innerHTML = `
+                <td colspan="5" style="padding:6px 20px">
+                    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between">
+                        <span style="font-size:13px;color:#374151">
+                            Delete <strong>${escapeHtml(user.name)}</strong>? This cannot be undone.
+                        </span>
+                        <div style="display:flex;gap:8px">
+                            <button type="button" onclick="closeOpenConfirm()"
+                                style="border:1px solid #e5e7eb;background:#fff;color:#374151;padding:5px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500">Cancel</button>
+                            <button type="button" onclick="confirmDeleteUser('${userId}')"
+                                style="background:#dc2626;color:#fff;padding:5px 14px;border-radius:6px;font-size:12px;cursor:pointer;border:none;font-weight:500">Delete</button>
+                        </div>
+                    </div>
+                </td>`;
+
+            const userRow = document.getElementById(`user-row-${userId}`);
+            if (userRow) userRow.insertAdjacentElement('afterend', confirmRow);
+        }
+
+        async function confirmDeleteUser(userId) {
+            closeOpenConfirm();
+            try {
+                const resp = await apiFetch(`/users/${userId}`, { method: 'DELETE' });
+                if (resp.status !== 204 && !resp.ok) {
+                    setUserManagementStatus('Could not delete user.', 'error');
+                    return;
+                }
+                // Fade-out the row, then remove it
+                const row = document.getElementById(`user-row-${userId}`);
+                if (row) {
+                    row.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+                    row.style.opacity    = '0';
+                    row.style.transform  = 'translateX(12px)';
+                    setTimeout(() => row.remove(), 370);
+                }
+                systemUsersState = systemUsersState.filter(u => u.id !== userId);
+                setUserManagementStatus('User deleted.', 'success');
+            } catch (_) {
+                setUserManagementStatus('Could not delete user. Check your connection.', 'error');
             }
         }
 
