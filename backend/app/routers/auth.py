@@ -784,9 +784,7 @@ async def create_invite(
     await db.flush()
     await db.refresh(invite)
 
-    invite_link = (
-        f"{_frontend_url()}/auth/accept-invite?token={raw_token}"
-    )
+    invite_link = f"http://localhost:3000/PhishGuard.html?invite={raw_token}"
     await _send_email(
         to=body.email,
         subject=f"You've been invited to join {current_user.full_name}'s PhishGuard organisation",

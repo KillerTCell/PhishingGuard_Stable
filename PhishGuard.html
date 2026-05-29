@@ -230,6 +230,44 @@ outline-offset: 2px;
                 </p>
             </div>
 
+            <!-- ═══════════════════════════════════════
+                 ACCEPT INVITE FORM
+                 ─────────────────────────────────────── -->
+            <div id="section-invite" class="hidden">
+                <div class="flex items-start gap-3 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-5">
+                    <iconify-icon icon="solar:letter-opened-linear" class="text-indigo-600 text-xl shrink-0 mt-0.5" aria-hidden="true"></iconify-icon>
+                    <p class="text-sm text-indigo-700 font-medium">You've been invited to join PhishGuard. Create your account below.</p>
+                </div>
+                <form id="invite-accept-form" class="space-y-4" onsubmit="handleAcceptInvite(event)" novalidate>
+                    <div>
+                        <label for="invite-accept-name" class="block text-xs font-medium text-slate-700 mb-1.5">Full Name</label>
+                        <div class="relative">
+                            <iconify-icon icon="solar:user-linear" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none" aria-hidden="true"></iconify-icon>
+                            <input id="invite-accept-name" name="name" type="text" autocomplete="name"
+                                placeholder="Your full name"
+                                class="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 shadow-sm"
+                                aria-describedby="invite-accept-error" aria-invalid="false" required>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="invite-accept-password" class="block text-xs font-medium text-slate-700 mb-1.5">Password</label>
+                        <div class="relative">
+                            <iconify-icon icon="solar:lock-keyhole-linear" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none" aria-hidden="true"></iconify-icon>
+                            <input id="invite-accept-password" name="password" type="password" autocomplete="new-password"
+                                placeholder="At least 8 characters"
+                                class="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 shadow-sm"
+                                aria-describedby="invite-accept-error" aria-invalid="false" required minlength="8">
+                        </div>
+                    </div>
+                    <p id="invite-accept-error" class="hidden text-xs text-rose-600 font-medium" aria-live="polite"></p>
+                    <button id="invite-accept-btn" type="submit"
+                        class="w-full flex items-center justify-center bg-slate-900 text-white font-medium text-sm py-2.5 rounded-xl shadow-sm hover:bg-slate-800 transition-colors mt-2 h-11">
+                        Create Account
+                        <iconify-icon icon="solar:arrow-right-linear" class="ml-2 text-base" stroke-width="1.5" aria-hidden="true"></iconify-icon>
+                    </button>
+                </form>
+            </div>
+
         </section>
     </div>
 
@@ -2139,10 +2177,12 @@ outline-offset: 2px;
             document.getElementById("section-login").classList.add("hidden");
             document.getElementById("section-signup").classList.add("hidden");
             document.getElementById("section-forgot").classList.add("hidden");
+            document.getElementById("section-invite").classList.add("hidden");
             clearAuthMessage();
             clearFormError("login-error");
             clearFormError("signup-error");
             clearFormError("forgot-error");
+            clearFormError("invite-accept-error");
 
             const heading    = document.getElementById("auth-heading");
             const subheading = document.getElementById("auth-subheading");
@@ -2162,6 +2202,11 @@ outline-offset: 2px;
                 heading.textContent    = "Reset your password";
                 subheading.textContent = "Enter your email and we'll send password reset instructions.";
                 document.getElementById("forgot-email")?.focus();
+            } else if (mode === "invite") {
+                document.getElementById("section-invite").classList.remove("hidden");
+                heading.textContent    = "Create your account";
+                subheading.textContent = "Complete your account setup to get started.";
+                document.getElementById("invite-accept-name")?.focus();
             }
         }
 
@@ -2310,6 +2355,103 @@ outline-offset: 2px;
             switchAuthMode("login");
         }
 
+        // ─── Accept Invite ────────────────────────────────────────────
+
+        async function handleAcceptInvite(event) {
+            event.preventDefault();
+            clearFormError("invite-accept-error");
+
+            const nameInput     = document.getElementById("invite-accept-name");
+            const passwordInput = document.getElementById("invite-accept-password");
+            const button        = document.getElementById("invite-accept-btn");
+            const fullName      = nameInput.value.trim();
+            const password      = passwordInput.value;
+            const inviteToken   = window._pendingInviteToken || '';
+
+            if (!fullName) {
+                showFormError("invite-accept-error", "Full name is required.");
+                setInputInvalid("invite-accept-name", true);
+                nameInput.focus();
+                return;
+            }
+            if (!password || password.length < 8) {
+                showFormError("invite-accept-error", "Password must be at least 8 characters.");
+                setInputInvalid("invite-accept-password", true);
+                passwordInput.focus();
+                return;
+            }
+            if (!inviteToken) {
+                showFormError("invite-accept-error", "Invite token is missing. Please use the link from your invitation email.");
+                return;
+            }
+
+            const originalText = button.innerHTML;
+            button.disabled  = true;
+            button.innerHTML = '<iconify-icon icon="solar:spinner-linear" class="animate-spin text-lg" aria-hidden="true"></iconify-icon><span class="sr-only">Creating account…</span>';
+
+            try {
+                const resp = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ full_name: fullName, password, invite_token: inviteToken }),
+                });
+
+                button.disabled  = false;
+                button.innerHTML = originalText;
+
+                if (resp.status === 200 || resp.status === 201) {
+                    const data = await resp.json();
+                    window.authToken = data.access_token;
+                    const role = data.role
+                        ? data.role.charAt(0).toUpperCase() + data.role.slice(1)
+                        : 'Analyst';
+
+                    currentUser = {
+                        role,
+                        email: '',
+                        name:  fullName,
+                        org_id:  data.org_id,
+                        org_name: '',
+                        forwarding_address: '',
+                    };
+
+                    // Fetch full profile to get email, org_name, forwarding address.
+                    try {
+                        const meResp = await apiFetch('/auth/me');
+                        if (meResp.ok) {
+                            const me = await meResp.json();
+                            currentUser.name               = me.full_name;
+                            currentUser.email              = me.email;
+                            currentUser.user_id            = me.id;
+                            currentUser.org_name           = me.org_name;
+                            currentUser.forwarding_address = me.forwarding_address;
+                        }
+                    } catch (_) { /* best-effort; name-derived fallback is in place */ }
+
+                    window._pendingInviteToken = null;
+                    updateUserProfile();
+                    connectSSE();
+                    openAppShell();
+                    navigate("home");
+                    showAppMessage(`Welcome to PhishGuard! Your account has been created as ${role}.`, "success");
+
+                } else if (resp.status === 400 || resp.status === 409 || resp.status === 422) {
+                    const data = await resp.json().catch(() => ({}));
+                    const msg = data.detail || data.message
+                        || "Invalid or expired invite link. Please ask your admin to send a new invitation.";
+                    showFormError("invite-accept-error", msg);
+                    setInputInvalid("invite-accept-name", true);
+                } else {
+                    showFormError("invite-accept-error", "Account creation failed. Please try again.");
+                }
+            } catch (_) {
+                button.disabled  = false;
+                button.innerHTML = originalText;
+                showFormError("invite-accept-error", "Unable to reach the server. Check your connection.");
+            }
+        }
+
         // ─── Forgot Password ──────────────────────────────────────────
 
         async function handleForgotPassword(event) {
@@ -2375,6 +2517,8 @@ outline-offset: 2px;
             document.getElementById("login-form")?.reset();
             document.getElementById("signup-form")?.reset();
             document.getElementById("forgot-form")?.reset();
+            document.getElementById("invite-accept-form")?.reset();
+            window._pendingInviteToken = null;
             switchAuthMode("login");
             setTimeout(() => {
                 login.classList.remove("opacity-0", "pointer-events-none");
@@ -3729,6 +3873,7 @@ outline-offset: 2px;
 
         async function handleInviteUser(event) {
             event.preventDefault();
+            const nameInput  = document.getElementById("invite-name");
             const emailInput = document.getElementById("invite-email");
             const roleInput  = document.getElementById("invite-role");
             const email      = emailInput.value.trim();
@@ -3749,22 +3894,31 @@ outline-offset: 2px;
                 return;
             }
 
+            let succeeded = false;
             try {
                 const resp = await apiFetch('/auth/invite', {
                     method: 'POST',
                     body: JSON.stringify({ email, role: role.toLowerCase() }),
                 });
-                if (resp.ok) {
-                    event.currentTarget.reset();
-                    setUserManagementStatus("Invite sent successfully.", "success");
-                    renderUserManagement();
+                if (resp.status === 200 || resp.status === 201) {
+                    // Clear all three form fields
+                    if (nameInput)  nameInput.value = '';
+                    emailInput.value = '';
+                    roleInput.value  = '';
+                    const statusEl = document.getElementById("user-management-status");
+                    setUserManagementStatus(`Invitation sent successfully to ${email}`, "success");
+                    setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 5000);
+                    succeeded = true;
                 } else {
                     const data = await resp.json().catch(() => ({}));
-                    setUserManagementStatus(data.message || "Invite failed.", "error");
+                    setUserManagementStatus(data.detail || data.message || "Invite failed.", "error");
                 }
             } catch (_) {
                 setUserManagementStatus("Invite failed. Check your connection.", "error");
             }
+            // Refresh user list outside the try/catch so a render error cannot
+            // overwrite the success message shown above.
+            if (succeeded) renderUserManagement();
         }
 
         async function handleUserRoleChange(userId, role) {
@@ -4118,8 +4272,17 @@ outline-offset: 2px;
         document.addEventListener("DOMContentLoaded", async () => {
             document.getElementById("login-view").classList.remove("hidden");
             document.getElementById("app-layout").classList.add("hidden");
-            document.getElementById("login-email").focus();
             updateUserProfile();
+
+            // Check for invite token in URL — show invite registration form if present.
+            const urlParams   = new URLSearchParams(window.location.search);
+            const inviteToken = urlParams.get('invite');
+            if (inviteToken) {
+                window._pendingInviteToken = inviteToken;
+                switchAuthMode('invite');
+            } else {
+                document.getElementById("login-email").focus();
+            }
 
             // Health check — warn if backend is unreachable before login attempt.
             try {
