@@ -70,8 +70,18 @@ outline-offset: 2px;
   from { opacity: 0; transform: scale(0.95) translateY(-8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 </style></head>
 <body class="bg-slate-50 text-slate-800 antialiased h-screen flex overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- Session-restore loading overlay — visible by default, hidden after tryRestoreSession() completes -->
+    <div id="session-loading" style="position:fixed;inset:0;background:white;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999">
+        <div style="width:48px;height:48px;border:3px solid #e5e7eb;border-top-color:#4f46e5;border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:16px"></div>
+        <p style="color:#6b7280;font-size:14px;font-weight:500">Loading PhishGuard…</p>
+    </div>
+
     <a href="#main-content" class="skip-link bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm">Skip to content</a>
 
     <!-- AUTH PAGE — sign in / sign up / forgot password -->
@@ -2065,6 +2075,81 @@ outline-offset: 2px;
             return { ok: true };
         }
 
+        // ── Session restore ─────────────────────────────────────────────
+        // Called on page load. Uses the HttpOnly refresh_token cookie
+        // (stored by the browser — survives page refresh) to silently
+        // restore the access token and populate currentUser.
+        // Returns true on success, false if no valid session exists.
+
+        async function tryRestoreSession() {
+            try {
+                const res = await fetch(`${API_BASE}/auth/refresh`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (!res.ok) return false;
+
+                const data = await res.json();
+                window.authToken = data.access_token;
+
+                // Fetch full profile so currentUser matches what login produces.
+                const meRes = await fetch(`${API_BASE}/auth/me`, {
+                    credentials: 'include',
+                    headers: authHeaders(),
+                });
+                if (!meRes.ok) { window.authToken = null; return false; }
+
+                const me = await meRes.json();
+                const role = me.role
+                    ? me.role.charAt(0).toUpperCase() + me.role.slice(1)
+                    : 'Analyst';
+                currentUser = {
+                    role,
+                    email:              me.email,
+                    name:               me.full_name || me.email.split('@')[0],
+                    user_id:            me.id,
+                    org_id:             me.org_id,
+                    org_name:           me.org_name,
+                    forwarding_address: me.forwarding_address,
+                };
+                updateUserProfile();
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        // ── Silent token refresh ────────────────────────────────────────
+        // Keeps the access token alive for sessions longer than 8 hours.
+        // Runs every 7 hours (1 hour before the JWT expires).
+
+        function startTokenRefreshTimer() {
+            if (window._tokenRefreshTimer) clearInterval(window._tokenRefreshTimer);
+            window._tokenRefreshTimer = setInterval(async () => {
+                try {
+                    const res = await fetch(`${API_BASE}/auth/refresh`, {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        window.authToken = data.access_token;
+                    } else {
+                        clearInterval(window._tokenRefreshTimer);
+                        window._tokenRefreshTimer = null;
+                        showSessionExpiredMessage();
+                    }
+                } catch (_) { /* network hiccup — will retry on next interval */ }
+            }, 7 * 60 * 60 * 1000); // 7 hours
+        }
+
+        function showSessionExpiredMessage() {
+            showAppMessage('Your session has expired. Please sign in again.');
+            setTimeout(() => logout(), 2000);
+        }
+
         // =====================================================
         // APP STATE
         // =====================================================
@@ -2364,6 +2449,7 @@ outline-offset: 2px;
             };
             updateUserProfile();
             connectSSE();
+            startTokenRefreshTimer();
             openAppShell();
             navigate("home");
             maybeShowRoleBanner();
@@ -2465,6 +2551,7 @@ outline-offset: 2px;
                     window._pendingInviteToken = null;
                     updateUserProfile();
                     connectSSE();
+                    startTokenRefreshTimer();
                     openAppShell();
                     navigate("home");
                     showAppMessage(`Welcome to PhishGuard! Your account has been created as ${role}.`, "success");
@@ -2546,6 +2633,12 @@ outline-offset: 2px;
         // ─── Logout ───────────────────────────────────────────────────
 
         async function logout() {
+            // Clear all background timers and intervals before wiping state.
+            if (window._tokenRefreshTimer) { clearInterval(window._tokenRefreshTimer); window._tokenRefreshTimer = null; }
+            if (exportPollInterval) { clearInterval(exportPollInterval); exportPollInterval = null; }
+            _activeExportSession = false;
+            currentExportJobId   = null;
+            currentExportFormat  = null;
             await logoutUser();
             disconnectSSE();
             conversationHistory = [];
@@ -4527,34 +4620,13 @@ outline-offset: 2px;
         // =====================================================
 
         document.addEventListener("DOMContentLoaded", async () => {
-            document.getElementById("login-view").classList.remove("hidden");
+            // Hide login-view while checking for an existing session — the
+            // #session-loading overlay covers everything in the meantime.
+            document.getElementById("login-view").classList.add("hidden");
             document.getElementById("app-layout").classList.add("hidden");
             updateUserProfile();
 
-            // Check for invite token in URL — show invite registration form if present.
-            // IMPORTANT: the token is NEVER validated client-side.
-            // It is sent as-is to POST /auth/register; only the backend validates it.
-            const urlParams   = new URLSearchParams(window.location.search);
-            const inviteToken = urlParams.get('invite');
-            if (inviteToken) {
-                window._pendingInviteToken = inviteToken;
-                switchAuthMode('invite');
-                document.getElementById("invite-accept-name")?.focus();
-            } else {
-                document.getElementById("login-email").focus();
-            }
-
-            // Health check — warn if backend is unreachable before login attempt.
-            try {
-                const ctrl   = new AbortController();
-                const tId    = setTimeout(() => ctrl.abort(), 5000);
-                const health = await fetch(`${API_BASE}/health`, { signal: ctrl.signal });
-                clearTimeout(tId);
-                if (!health.ok) showAppMessage("Backend is starting up. Please wait a moment before signing in.");
-            } catch (_) {
-                showAppMessage("Backend is not reachable. Check that the server is running.");
-            }
-
+            // ── Synchronous event listeners (set up before any await) ──────
             document.addEventListener("keydown", event => {
                 if (event.key === "Escape") {
                     const modal = document.getElementById('user-action-modal');
@@ -4562,10 +4634,63 @@ outline-offset: 2px;
                     closeSidebar();
                 }
             });
-            // Close modal when clicking the dark overlay
             document.getElementById('user-action-modal')?.addEventListener('click', e => {
                 if (e.target === document.getElementById('user-action-modal')) closeUserModal();
             });
+
+            // ── Tab visibility — silently verify session when user returns ──
+            document.addEventListener('visibilitychange', async () => {
+                if (document.visibilityState === 'visible' && window.authToken && currentUser) {
+                    try {
+                        const res = await fetch(`${API_BASE}/auth/me`, {
+                            credentials: 'include',
+                            headers: authHeaders(),
+                        });
+                        if (res.status === 401) {
+                            const refreshed = await tryRestoreSession();
+                            if (!refreshed) showSessionExpiredMessage();
+                        }
+                    } catch (_) { /* network error — let next API call handle it */ }
+                }
+            });
+
+            // ── Session restore — try the HttpOnly refresh cookie ───────────
+            // The cookie is sent automatically by the browser; no JS can read it.
+            // If this succeeds we skip the login screen entirely.
+            const sessionRestored = await tryRestoreSession();
+            document.getElementById('session-loading').style.display = 'none';
+
+            if (sessionRestored) {
+                // Valid session — go straight to the dashboard.
+                startTokenRefreshTimer();
+                connectSSE();
+                document.getElementById("app-layout").classList.remove("hidden");
+                navigate("home");
+                maybeShowRoleBanner();
+            } else {
+                // No valid session — show the login screen.
+                const urlParams   = new URLSearchParams(window.location.search);
+                const inviteToken = urlParams.get('invite');
+                if (inviteToken) {
+                    window._pendingInviteToken = inviteToken;
+                    switchAuthMode('invite');
+                    document.getElementById("invite-accept-name")?.focus();
+                } else {
+                    document.getElementById("login-email")?.focus();
+                }
+                document.getElementById("login-view").classList.remove("hidden");
+
+                // Health check — warn if backend is unreachable before sign-in.
+                try {
+                    const ctrl   = new AbortController();
+                    const tId    = setTimeout(() => ctrl.abort(), 5000);
+                    const health = await fetch(`${API_BASE}/health`, { signal: ctrl.signal });
+                    clearTimeout(tId);
+                    if (!health.ok) showAppMessage("Backend is starting up. Please wait a moment before signing in.");
+                } catch (_) {
+                    showAppMessage("Backend is not reachable. Check that the server is running.");
+                }
+            }
         });
 
         // All API calls are now wired to the real backend at API_BASE.
