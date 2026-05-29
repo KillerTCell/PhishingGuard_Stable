@@ -1320,11 +1320,20 @@ outline-offset: 2px;
                                     <form id="export-form" class="space-y-3" onsubmit="runExportTest(event)">
                                         <div>
                                             <label for="export-format" class="block text-sm font-medium text-slate-700 mb-1.5">Format</label>
-                                            <select id="export-format" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900">
-                                                <option value="csv">CSV</option>
-                                                <option value="json">JSON</option>
-                                                <option value="jsonl">JSONL</option>
+                                            <select id="export-format" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900" onchange="onExportFormatChange()">
+                                                <option value="csv">CSV — spreadsheet / analysis tools</option>
+                                                <option value="json">JSON — developer / API format</option>
+                                                <option value="jsonl">JSONL — ML training format</option>
+                                                <option value="eml">EML — re-upload or open in email client (ZIP)</option>
                                             </select>
+                                            <div id="export-eml-info" style="display:none;margin-top:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;font-size:13px;color:#1e40af;line-height:1.55">
+                                                📧 <strong>EML Export</strong> — downloads as a ZIP file containing one <code>.eml</code> file per email.<br>
+                                                Each file can be:<br>
+                                                &bull; Re-uploaded to PhishGuard for re-analysis<br>
+                                                &bull; Opened in Outlook, Apple Mail, or Thunderbird<br>
+                                                &bull; Shared with your security team<br>
+                                                Each <code>.eml</code> includes PhishGuard metadata headers (risk score, classification, label).
+                                            </div>
                                         </div>
                                         <div>
                                             <label for="export-date-range" class="block text-sm font-medium text-slate-700 mb-1.5">Date range</label>
@@ -3632,6 +3641,20 @@ outline-offset: 2px;
         // DATA EXPORT
         // =====================================================
 
+        // Returns a small coloured badge for the export format column.
+        function exportFormatBadge(fmt) {
+            const f = (fmt || 'csv').toLowerCase();
+            const styles = {
+                csv:   'background:#f1f5f9;color:#475569;border:1px solid #e2e8f0',
+                json:  'background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe',
+                jsonl: 'background:#f3e8ff;color:#7c3aed;border:1px solid #e9d5ff',
+                eml:   'background:#d1fae5;color:#065f46;border:1px solid #a7f3d0',
+            };
+            const style = styles[f] || styles.csv;
+            const label = f === 'eml' ? '📧 EML' : f.toUpperCase();
+            return `<span style="${style};border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;display:inline-block">${label}</span>`;
+        }
+
         // Download an export file via apiFetch so the Authorization header is sent.
         // Direct <a href> links won't work because JWT auth requires a header, not a cookie.
         async function downloadExport(jobId, format) {
@@ -3642,7 +3665,9 @@ outline-offset: 2px;
                 const url  = URL.createObjectURL(blob);
                 const a    = document.createElement('a');
                 a.href     = url;
-                a.download = `phishguard-export.${format || 'csv'}`;
+                a.download = format === 'eml'
+                    ? `phishguard-emails.zip`
+                    : `phishguard-export.${format || 'csv'}`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -3673,7 +3698,7 @@ outline-offset: 2px;
                                 hbody.innerHTML = `
                                     <tr>
                                         <td class="px-5 py-3 text-slate-500">${new Date().toLocaleString()}</td>
-                                        <td class="px-5 py-3 font-medium text-slate-900">${escapeHtml(cfg.format.toUpperCase())}</td>
+                                        <td class="px-5 py-3">${exportFormatBadge(cfg.format)}</td>
                                         <td class="px-5 py-3">—</td>
                                         <td class="px-5 py-3 flex items-center gap-2">
                                             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">Ready</span>
@@ -3689,7 +3714,9 @@ outline-offset: 2px;
                                 const url  = URL.createObjectURL(blob);
                                 const a    = document.createElement('a');
                                 a.href     = url;
-                                a.download = `phishguard-export.${cfg.format}`;
+                                a.download = cfg.format === 'eml'
+                                    ? 'phishguard-emails.zip'
+                                    : `phishguard-export.${cfg.format}`;
                                 document.body.appendChild(a);
                                 a.click();
                                 document.body.removeChild(a);
@@ -3721,7 +3748,7 @@ outline-offset: 2px;
                                 hbody.innerHTML = `
                                     <tr>
                                         <td class="px-5 py-3 text-slate-500">${job.created_at ? new Date(job.created_at).toLocaleString() : "—"}</td>
-                                        <td class="px-5 py-3 font-medium text-slate-900">${escapeHtml((job.format || cfg.format).toUpperCase())}</td>
+                                        <td class="px-5 py-3">${exportFormatBadge(job.format || cfg.format)}</td>
                                         <td class="px-5 py-3">${formatNumber(job.estimated_scope?.emails ?? 0)}</td>
                                         <td class="px-5 py-3">
                                             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${statusClass}">${capitalize(job.status)}</span>
@@ -3736,6 +3763,12 @@ outline-offset: 2px;
                 const hbody = document.getElementById("export-history-body");
                 if (hbody) hbody.innerHTML = `<tr><td colspan="4" class="px-5 py-10 text-center text-slate-500 text-sm">No export history is available.</td></tr>`;
             }
+        }
+
+        function onExportFormatChange() {
+            const fmt    = document.getElementById("export-format")?.value || "csv";
+            const infoEl = document.getElementById("export-eml-info");
+            if (infoEl) infoEl.style.display = fmt === "eml" ? "block" : "none";
         }
 
         function getExportConfig() {

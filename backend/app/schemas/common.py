@@ -97,6 +97,7 @@ class ExportFormat(str, Enum):
     csv = "csv"
     json = "json"
     jsonl = "jsonl"
+    eml = "eml"
 
 
 class ExportDateRange(str, Enum):

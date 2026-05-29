@@ -361,11 +361,26 @@ async def get_export(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Export file no longer available",
             )
-        filename = f"phishguard-export-{job_id}.{job.format}"
+        date_str = job.created_at.strftime("%Y%m%d") if job.created_at else str(job_id)[:8]
+        if job.format == "eml":
+            filename   = f"phishguard-emails-{date_str}.zip"
+            media_type = "application/zip"
+        elif job.format == "csv":
+            filename   = f"phishguard-export-{date_str}.csv"
+            media_type = "text/csv"
+        elif job.format == "json":
+            filename   = f"phishguard-export-{date_str}.json"
+            media_type = "application/json"
+        elif job.format == "jsonl":
+            filename   = f"phishguard-export-{date_str}.jsonl"
+            media_type = "application/x-ndjson"
+        else:
+            filename   = f"phishguard-export-{date_str}.{job.format}"
+            media_type = "application/octet-stream"
         return FileResponse(
             path=file_path,
             filename=filename,
-            media_type="application/octet-stream",
+            media_type=media_type,
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 

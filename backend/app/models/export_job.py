@@ -45,7 +45,7 @@ class ExportJob(Base):  # type: ignore[misc]  # SQLAlchemy declarative_base() re
     __tablename__ = "export_jobs"
     __table_args__ = (
         CheckConstraint(
-            "format IN ('csv','json','jsonl')",
+            "format IN ('csv','json','jsonl','eml')",
             name="export_job_format_check",
         ),
         CheckConstraint(

@@ -20,7 +20,11 @@ import functools
 import json
 import os
 import uuid
+import zipfile
 from datetime import datetime, timedelta, timezone
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formatdate
 from typing import Any
 
 import structlog
@@ -156,7 +160,7 @@ def generate_export(self: Any, job_id: str) -> None:
             return
 
         org_id: uuid.UUID = job.org_id
-        fmt: str = job.format                   # 'csv' | 'json' | 'jsonl'
+        fmt: str = job.format                   # 'csv' | 'json' | 'jsonl' | 'eml'
         date_range: str = job.date_range        # '7d' | '30d' | 'all'
         label_filter: str = job.label_filter or "all"
 
@@ -191,6 +195,8 @@ def generate_export(self: Any, job_id: str) -> None:
                 Email.spf,
                 Email.dkim,
                 Email.dmarc,
+                Email.body_text,
+                Email.html_sanitised,
                 AnalysisResult.classification,
                 AnalysisResult.risk_score,
                 AnalysisResult.explanation,
@@ -217,7 +223,9 @@ def generate_export(self: Any, job_id: str) -> None:
         # ── 4. Create export directory ────────────────────────────────────
         export_dir = os.path.join(settings.EXPORT_VOLUME_PATH, str(org_id))
         os.makedirs(export_dir, exist_ok=True)
-        file_path = os.path.join(export_dir, f"{job_id}.{fmt}")
+        # EML exports produce a ZIP archive; all other formats use their own extension.
+        file_ext = "zip" if fmt == "eml" else fmt
+        file_path = os.path.join(export_dir, f"{job_id}.{file_ext}")
 
         # ── 5. Write file ─────────────────────────────────────────────────
         if fmt == "csv":
@@ -232,7 +240,7 @@ def generate_export(self: Any, job_id: str) -> None:
                 for row in rows:
                     fh.write(json.dumps(_row_to_dict(row), default=str) + "\n")
 
-        else:  # json
+        elif fmt == "json":
             with open(file_path, "w", encoding="utf-8") as fh:
                 json.dump(
                     [_row_to_dict(row) for row in rows],
@@ -240,6 +248,60 @@ def generate_export(self: Any, job_id: str) -> None:
                     default=str,
                     ensure_ascii=False,
                 )
+
+        else:  # eml — ZIP archive of individual .eml files
+            with zipfile.ZipFile(file_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for i, row in enumerate(rows):
+                    # Build a standards-compliant .eml file for each email record.
+                    msg = MIMEMultipart("mixed")
+
+                    # Standard RFC 2822 headers
+                    msg["From"]    = str(row.sender or "unknown@unknown.com")
+                    msg["To"]      = str(row.recipient_address or "")
+                    msg["Subject"] = str(row.subject or "(No Subject)")
+
+                    received_at = row.received_at
+                    if received_at is not None:
+                        ts = received_at.timestamp() if hasattr(received_at, "timestamp") else None
+                        msg["Date"] = formatdate(ts) if ts is not None else str(received_at)
+                    else:
+                        msg["Date"] = formatdate()
+
+                    # PhishGuard metadata headers — surfaced for re-import and triage.
+                    if row.risk_score is not None:
+                        msg["X-PhishGuard-Risk-Score"]    = str(row.risk_score)
+                    if row.classification:
+                        msg["X-PhishGuard-Classification"] = str(row.classification)
+                    if row.feedback_label:
+                        msg["X-PhishGuard-Label"]          = str(row.feedback_label)
+
+                    # Authentication headers (if stored)
+                    if row.spf:
+                        msg["X-PhishGuard-SPF"]  = str(row.spf)
+                    if row.dkim:
+                        msg["X-PhishGuard-DKIM"] = str(row.dkim)
+                    if row.dmarc:
+                        msg["X-PhishGuard-DMARC"] = str(row.dmarc)
+
+                    # Body parts — prefer plain text; attach sanitised HTML when available.
+                    body_text = row.body_text or ""
+                    html_body = row.html_sanitised or ""
+                    if body_text:
+                        msg.attach(MIMEText(body_text, "plain", "utf-8"))
+                    if html_body:
+                        msg.attach(MIMEText(html_body, "html", "utf-8"))
+                    if not body_text and not html_body:
+                        # Guarantee at least one body part so the .eml is valid.
+                        msg.attach(MIMEText("(No body content)", "plain", "utf-8"))
+
+                    # Build a safe filename: index + truncated subject slug.
+                    subject_raw = str(row.subject or "email")[:40]
+                    subject_safe = "".join(
+                        c for c in subject_raw if c.isalnum() or c in (" ", "-", "_")
+                    ).strip() or f"email_{i + 1}"
+                    eml_filename = f"{i + 1:04d}_{subject_safe}.eml"
+
+                    zf.writestr(eml_filename, msg.as_string())
 
         # ── 6. Mark ready ─────────────────────────────────────────────────
         completed_at = datetime.now(timezone.utc)

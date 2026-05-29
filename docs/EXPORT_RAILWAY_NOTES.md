@@ -117,6 +117,55 @@ Omitting `export` from `-Q` means export jobs will never be picked up.
 The export query (emails + analysis_results + feedback LEFT JOINs) uses the
 standard database connection — no extra configuration required.
 
-Format support: `csv`, `json`, `jsonl`.
+Format support: `csv`, `json`, `jsonl`, `eml`.
 Date range: `7d`, `30d`, `all`.
 Label filter: `all`, `phishing`, `safe`, `needs_investigation`.
+
+## EML Export (added 2026-05-29)
+
+EML format produces a ZIP archive (`{job_id}.zip`) containing one `.eml` file
+per email record. Each `.eml` is a valid RFC 2822 message with:
+- Standard headers: `From`, `To`, `Subject`, `Date`
+- PhishGuard metadata headers: `X-PhishGuard-Risk-Score`,
+  `X-PhishGuard-Classification`, `X-PhishGuard-Label`,
+  `X-PhishGuard-SPF`, `X-PhishGuard-DKIM`, `X-PhishGuard-DMARC`
+- Body parts: `text/plain` (from `body_text`) + `text/html` sanitised
+  (from `html_sanitised`) when available
+
+### Changed files
+
+| File | Change | Railway impact |
+|---|---|---|
+| `backend/app/schemas/common.py` | Added `eml` to `ExportFormat` enum | None — applies automatically |
+| `backend/app/models/export_job.py` | Added `'eml'` to format CHECK constraint | **Run `alembic upgrade head`** |
+| `backend/alembic/versions/d4e5f6a7b8c9_add_eml_to_export_format_constraint.py` | Migration for constraint change | **Run `alembic upgrade head`** |
+| `backend/app/tasks/export_tasks.py` | EML branch — ZIP of .eml files | None — applies automatically |
+| `backend/app/routers/settings.py` | `application/zip` media type for EML downloads | None — applies automatically |
+| `PhishGuard.html` | EML option in dropdown, info box, green badge | None — frontend only |
+
+### Railway deployment step
+
+After deploying, run the migration once:
+```
+railway run alembic upgrade head
+```
+
+Or via docker compose locally:
+```
+docker compose exec api alembic upgrade head
+```
+
+### File extension
+
+EML exports are stored as `.zip` (not `.eml`) because a single export
+contains multiple emails. The file is named:
+```
+phishguard-emails-{YYYYMMDD}.zip
+```
+
+### Round-trip re-upload
+
+Each `.eml` file in the ZIP can be re-uploaded to PhishGuard via the
+"Upload .eml" tab on the Analyse Email page. The PhishGuard metadata
+headers are ignored on re-import (they are not parsed by the ingestion
+pipeline) — the email is re-analysed fresh by the ML model.
