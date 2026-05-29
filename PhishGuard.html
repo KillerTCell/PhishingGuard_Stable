@@ -238,6 +238,16 @@ outline-offset: 2px;
                     <iconify-icon icon="solar:letter-opened-linear" class="text-indigo-600 text-xl shrink-0 mt-0.5" aria-hidden="true"></iconify-icon>
                     <p class="text-sm text-indigo-700 font-medium">You've been invited to join PhishGuard. Create your account below.</p>
                 </div>
+                <!-- SSL certificate warning — visible only when https://localhost cert not yet trusted -->
+                <div id="invite-ssl-warning" class="hidden flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5" role="alert" aria-live="polite">
+                    <iconify-icon icon="solar:shield-warning-linear" class="text-amber-600 text-xl shrink-0 mt-0.5" aria-hidden="true"></iconify-icon>
+                    <p class="text-sm text-amber-800">
+                        Before creating your account, please
+                        <a href="https://localhost/api/v1/health" target="_blank" rel="noopener noreferrer"
+                           class="font-semibold underline hover:text-amber-900">visit this link</a>
+                        and accept the security certificate, then come back and refresh this page.
+                    </p>
+                </div>
                 <form id="invite-accept-form" class="space-y-4" onsubmit="handleAcceptInvite(event)" novalidate>
                     <div>
                         <label for="invite-accept-name" class="block text-xs font-medium text-slate-700 mb-1.5">Full Name</label>
@@ -4280,6 +4290,28 @@ outline-offset: 2px;
             if (inviteToken) {
                 window._pendingInviteToken = inviteToken;
                 switchAuthMode('invite');
+
+                // Ping the API over HTTPS to detect whether the self-signed
+                // SSL certificate has been accepted by the browser yet.
+                // If the ping throws (net::ERR_CERT_AUTHORITY_INVALID etc.)
+                // the register fetch would fail too — show guidance instead.
+                try {
+                    const ctrl = new AbortController();
+                    const tid  = setTimeout(() => ctrl.abort(), 4000);
+                    await fetch(`${API_BASE}/health`, {
+                        signal: ctrl.signal,
+                        credentials: 'include',
+                    });
+                    clearTimeout(tid);
+                    // SSL cert accepted — form is ready, focus the name field.
+                    document.getElementById("invite-accept-name")?.focus();
+                } catch (_) {
+                    // SSL cert not yet accepted — hide the form, show the banner.
+                    const sslBanner = document.getElementById("invite-ssl-warning");
+                    const form      = document.getElementById("invite-accept-form");
+                    if (sslBanner) sslBanner.classList.remove("hidden");
+                    if (form)      form.classList.add("hidden");
+                }
             } else {
                 document.getElementById("login-email").focus();
             }
