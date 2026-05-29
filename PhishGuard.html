@@ -2390,7 +2390,11 @@ outline-offset: 2px;
             button.innerHTML = '<iconify-icon icon="solar:spinner-linear" class="animate-spin text-lg" aria-hidden="true"></iconify-icon><span class="sr-only">Creating account…</span>';
 
             try {
-                const resp = await fetch(`${API_BASE}/auth/register`, {
+                // POST /auth/accept-invite — NOT /auth/register.
+                // /auth/register requires email in the body (new-org path).
+                // /auth/accept-invite takes only { invite_token, full_name, password }
+                // and reads the pre-set email from the invite record in the DB.
+                const resp = await fetch(`${API_BASE}/auth/accept-invite`, {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
@@ -2437,10 +2441,18 @@ outline-offset: 2px;
                     showAppMessage(`Welcome to PhishGuard! Your account has been created as ${role}.`, "success");
 
                 } else if (resp.status === 400 || resp.status === 409 || resp.status === 422) {
-                    const data = await resp.json().catch(() => ({}));
-                    const msg = data.detail || data.message
-                        || "Invalid or expired invite link. Please ask your admin to send a new invitation.";
-                    showFormError("invite-accept-error", msg);
+                    // Show the exact backend error — Pydantic validation errors have
+                    // detail as an array; HTTPException detail is a string.
+                    // Our custom handler wraps both under error.message / error.details.
+                    const errorData = await resp.json().catch(() => ({}));
+                    const detail = errorData?.error?.message || errorData?.detail;
+                    let message = 'Invalid or expired invite link. Please ask your admin to send a new invitation.';
+                    if (Array.isArray(detail)) {
+                        message = detail.map(e => e.msg || e.message || String(e)).join(', ');
+                    } else if (typeof detail === 'string' && detail) {
+                        message = detail;
+                    }
+                    showFormError("invite-accept-error", message);
                     setInputInvalid("invite-accept-name", true);
                 } else {
                     showFormError("invite-accept-error", "Account creation failed. Please try again.");

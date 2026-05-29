@@ -61,6 +61,42 @@ After Railway deploy: dashboard URL will be Railway URL.
 The dynamic API_BASE fix in point 3 above handles this
 automatically if implemented correctly.
 
+## 8. Token Validation — Critical Implementation Note
+
+The invite token lookup MUST use SHA-256 (deterministic hash), NOT bcrypt.
+Invite tokens are long random secrets (secrets.token_urlsafe(48) = 384 bits)
+so they do not need the salt-per-hash protection that bcrypt provides for
+user-chosen passwords.
+
+CORRECT (current implementation — do not change):
+  token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+  result = db.execute(
+    select(InviteToken).where(
+      InviteToken.token_hash == token_hash,
+      InviteToken.used_at.is_(None),
+    )
+  )
+  invite = result.scalar_one_or_none()
+  if invite is None or invite.expires_at < datetime.now(timezone.utc):
+    raise HTTPException(422, "Invite token is invalid or expired")
+
+WRONG — will always fail (bcrypt is non-deterministic):
+  # Each call to bcrypt.hashpw() produces a DIFFERENT hash even for the
+  # same input, so WHERE token_hash = bcrypt(raw) never matches.
+  token = db.execute(
+    select(InviteToken).where(
+      InviteToken.token_hash == bcrypt.hashpw(raw.encode(), salt)
+    )
+  ).first()
+
+The endpoint that handles invite acceptance is POST /auth/accept-invite
+(NOT POST /auth/register — /auth/register requires email in the body,
+which the invite form does not collect because email comes from the
+stored invite record).
+
+This applies in both local Docker AND Railway deployment.
+Never change this lookup pattern or endpoint.
+
 ## SUMMARY — Minimum changes before Railway deploy
 | What | File | Change |
 |---|---|---|

@@ -840,6 +840,16 @@ async def accept_invite(
     Issues access token and rotates the refresh cookie on success.
     Audits ``login_success`` so the event appears in the admin audit log.
     """
+    # NOTE FOR RAILWAY DEPLOYMENT:
+    # Invite token lookup uses SHA-256 (deterministic), NOT bcrypt.
+    # SHA-256 is safe here because invite tokens are long random secrets
+    # (secrets.token_urlsafe(48) = 384 bits of entropy) — not user-chosen
+    # passwords, so rainbow-table attacks are not a concern.
+    #
+    # The lookup is: sha256(raw_token) == stored token_hash (WHERE clause).
+    # This is correct and intentional — do not change to bcrypt.checkpw()
+    # (bcrypt is non-deterministic; a WHERE clause comparison would always fail).
+    # Do not change this lookup method.
     token_hash = hashlib.sha256(body.invite_token.encode()).hexdigest()
     result = await db.execute(
         select(InviteToken).where(
