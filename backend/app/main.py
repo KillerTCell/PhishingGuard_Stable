@@ -319,11 +319,27 @@ def create_app() -> FastAPI:
         )
 
     # ── CORS ──────────────────────────────────────────────────────────────
-    cors_origins: list[str] = [
+    # Always include the dev localhost origins so the invite registration
+    # flow works from http://localhost:3000 and http://127.0.0.1:3000.
+    # "null" covers file:// origins (browser opens the HTML directly).
+    # Additional origins from CORS_ORIGINS env var are appended after,
+    # with duplicates removed while preserving order.
+    _dev_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost",
+        "https://localhost",
+        "http://127.0.0.1:3000",
+        "null",
+    ]
+    _env_origins: list[str] = [
         o.strip()
         for o in settings.CORS_ORIGINS.split(",")
         if o.strip()
     ]
+    # Merge: dev origins first, then env extras, dedup while keeping order.
+    cors_origins: list[str] = list(
+        dict.fromkeys(_dev_origins + _env_origins)
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
