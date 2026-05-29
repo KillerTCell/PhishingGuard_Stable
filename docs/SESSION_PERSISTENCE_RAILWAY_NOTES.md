@@ -82,3 +82,47 @@ testing of the session restore flow.
    auto-redirect to login after 2 seconds
 5. Click Logout → cookie is cleared server-side → page refresh now
    shows login (session restore fails cleanly)
+
+---
+
+## Inactivity Timeout (added 2026-05-30)
+
+### Behaviour
+
+| Time | What happens |
+|---|---|
+| 0–19 min of inactivity | No interruption |
+| 19 min | Warning modal appears with 60-second countdown |
+| 19 min + user clicks "I'm still here" | Modal closes, full 20-minute timer resets |
+| 19 min + user clicks "Sign out now" | Immediate logout |
+| 20 min (no interaction) | Auto-logout — login screen shows with amber warning banner |
+| Escape key while modal is showing | Same as "I'm still here" |
+
+### Activity events tracked
+
+`mousemove`, `mousedown`, `keydown`, `scroll`, `touchstart`, `click`
+
+Any of these events resets the 20-minute timer.
+
+### Configuring the timeout
+
+To change the timeout, find this line in `PhishGuard.html`:
+
+```javascript
+const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
+```
+
+The warning always appears `WARNING_BEFORE_MS` (1 minute) before the logout fires.
+
+### Connections cleaned up on inactivity logout
+
+`handleInactivityLogout()` calls `logout()` which handles:
+- `stopInactivityTracking()` — removes all event listeners, clears all timers
+- `_tokenRefreshTimer` — cleared
+- `exportPollInterval` — cleared
+- `disconnectSSE()` — EventSource closed
+- `POST /auth/logout` — backend blacklists the refresh token JTI and clears the cookie
+
+### Railway impact
+
+None — frontend only. Works identically in local Docker and Railway production.

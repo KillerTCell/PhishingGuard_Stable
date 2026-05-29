@@ -73,6 +73,10 @@ outline-offset: 2px;
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.08); }
+}
 </style></head>
 <body class="bg-slate-50 text-slate-800 antialiased h-screen flex overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
 
@@ -80,6 +84,28 @@ outline-offset: 2px;
     <div id="session-loading" style="position:fixed;inset:0;background:white;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999">
         <div style="width:48px;height:48px;border:3px solid #e5e7eb;border-top-color:#4f46e5;border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:16px"></div>
         <p style="color:#6b7280;font-size:14px;font-weight:500">Loading PhishGuard…</p>
+    </div>
+
+    <!-- Inactivity warning modal — shown 1 minute before auto-logout -->
+    <div id="inactivity-warning" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:999999;align-items:center;justify-content:center" role="alertdialog" aria-modal="true" aria-labelledby="inactivity-title">
+        <div style="background:white;border-radius:16px;padding:32px;max-width:400px;width:90%;box-shadow:0 25px 50px rgba(0,0,0,0.3);text-align:center">
+            <div style="width:56px;height:56px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:26px">⏱</div>
+            <h3 id="inactivity-title" style="font-size:18px;font-weight:700;color:#111827;margin-bottom:8px">Still there?</h3>
+            <p style="color:#6b7280;font-size:14px;line-height:1.6;margin-bottom:8px">
+                You've been inactive for 19 minutes.<br>
+                For security, you'll be signed out in:
+            </p>
+            <div id="inactivity-countdown" style="font-size:36px;font-weight:800;color:#ef4444;margin:12px 0 4px;font-variant-numeric:tabular-nums">60</div>
+            <p style="color:#9ca3af;font-size:12px;margin-bottom:20px">seconds</p>
+            <div style="display:flex;gap:12px">
+                <button onclick="handleInactivityLogout()" style="flex:1;padding:11px;border-radius:8px;border:1px solid #e5e7eb;background:white;color:#6b7280;font-size:14px;font-weight:500;cursor:pointer">
+                    Sign out now
+                </button>
+                <button onclick="resetInactivityTimer()" style="flex:2;padding:11px;border-radius:8px;border:none;background:#4f46e5;color:white;font-size:14px;font-weight:600;cursor:pointer">
+                    I'm still here
+                </button>
+            </div>
+        </div>
     </div>
 
     <a href="#main-content" class="skip-link bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm">Skip to content</a>
@@ -2146,8 +2172,102 @@ outline-offset: 2px;
         }
 
         function showSessionExpiredMessage() {
-            showAppMessage('Your session has expired. Please sign in again.');
-            setTimeout(() => logout(), 2000);
+            // logout() already calls stopInactivityTracking() and clears all timers.
+            logout().then(() => {
+                setTimeout(() => showAuthMessage(
+                    'Your session has expired. Please sign in again.',
+                    'warning'
+                ), 150);
+            });
+        }
+
+        // ── Inactivity tracking ─────────────────────────────────────────
+
+        function resetInactivityTimer() {
+            // Only track inactivity when a user is signed in.
+            if (!window.authToken || !currentUser) return;
+
+            clearTimeout(_inactivityTimer);
+            clearTimeout(_warningTimer);
+            hideInactivityWarning();
+
+            // Warning fires 1 minute before the logout deadline.
+            _warningTimer = setTimeout(showInactivityWarning, INACTIVITY_TIMEOUT_MS - WARNING_BEFORE_MS);
+
+            // Logout fires after the full inactivity period.
+            _inactivityTimer = setTimeout(handleInactivityLogout, INACTIVITY_TIMEOUT_MS);
+        }
+
+        function startInactivityTracking() {
+            // Attach listeners using { passive: true } — never blocks scrolling.
+            ACTIVITY_EVENTS.forEach(evt =>
+                document.addEventListener(evt, resetInactivityTimer, { passive: true })
+            );
+            resetInactivityTimer(); // kick off the first timer immediately
+        }
+
+        function stopInactivityTracking() {
+            ACTIVITY_EVENTS.forEach(evt =>
+                document.removeEventListener(evt, resetInactivityTimer)
+            );
+            clearTimeout(_inactivityTimer);
+            clearTimeout(_warningTimer);
+            clearInterval(_countdownInterval);
+            _inactivityTimer   = null;
+            _warningTimer      = null;
+            _countdownInterval = null;
+        }
+
+        function showInactivityWarning() {
+            const modal       = document.getElementById('inactivity-warning');
+            const countdownEl = document.getElementById('inactivity-countdown');
+            if (!modal) return;
+
+            modal.style.display = 'flex';
+
+            let secondsLeft = Math.round(WARNING_BEFORE_MS / 1000);
+            if (countdownEl) countdownEl.textContent = secondsLeft;
+
+            clearInterval(_countdownInterval);
+            _countdownInterval = setInterval(() => {
+                secondsLeft -= 1;
+                if (countdownEl) {
+                    countdownEl.textContent = secondsLeft;
+                    if (secondsLeft <= 10) {
+                        countdownEl.style.animation = 'pulse 0.5s ease-in-out infinite';
+                    }
+                }
+                if (secondsLeft <= 0) {
+                    clearInterval(_countdownInterval);
+                    _countdownInterval = null;
+                }
+            }, 1000);
+        }
+
+        function hideInactivityWarning() {
+            const modal       = document.getElementById('inactivity-warning');
+            const countdownEl = document.getElementById('inactivity-countdown');
+            if (modal) modal.style.display = 'none';
+            clearInterval(_countdownInterval);
+            _countdownInterval = null;
+            if (countdownEl) {
+                countdownEl.textContent  = String(Math.round(WARNING_BEFORE_MS / 1000));
+                countdownEl.style.color     = '#ef4444';
+                countdownEl.style.animation = 'none';
+            }
+        }
+
+        async function handleInactivityLogout() {
+            stopInactivityTracking();
+            hideInactivityWarning();
+            // logout() clears all other timers (token refresh, export poll, SSE)
+            // and calls the backend to blacklist the refresh token.
+            await logout();
+            setTimeout(() => showAuthMessage(
+                'You were automatically signed out after 20 minutes of inactivity. ' +
+                'Please sign in again to continue.',
+                'warning'
+            ), 150);
         }
 
         // =====================================================
@@ -2184,6 +2304,14 @@ outline-offset: 2px;
         let currentExportFormat  = null;   // format stored at submit time (not the dropdown's current value)
         let exportPollInterval   = null;   // setInterval handle for export status polling
         let _activeExportSession = false;  // true only while polling after the user clicks Generate Export
+
+        // ── Inactivity timeout ──────────────────────────────────────────
+        const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
+        const WARNING_BEFORE_MS     =  1 * 60 * 1000; // warn 1 minute before logout
+        const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+        let _inactivityTimer    = null;
+        let _warningTimer       = null;
+        let _countdownInterval  = null;
 
         // =====================================================
         // SMALL HELPERS
@@ -2249,7 +2377,7 @@ outline-offset: 2px;
             el.classList.add("hidden");
         }
 
-        // tone: "success" | "info" | "error"
+        // tone: "success" | "info" | "warning" | "error"
         function showAuthMessage(message, tone = "success") {
             const el = document.getElementById("auth-message");
             if (!el) return;
@@ -2258,6 +2386,7 @@ outline-offset: 2px;
                 "hidden", "flex",
                 "bg-emerald-50", "border-emerald-100", "text-emerald-700",
                 "bg-indigo-50",  "border-indigo-100",  "text-indigo-700",
+                "bg-amber-50",   "border-amber-200",   "text-amber-800",
                 "bg-rose-50",    "border-rose-100",    "text-rose-700"
             );
             el.classList.add("flex");
@@ -2265,6 +2394,8 @@ outline-offset: 2px;
                 el.classList.add("bg-emerald-50", "border", "border-emerald-100", "text-emerald-700");
             } else if (tone === "info") {
                 el.classList.add("bg-indigo-50", "border", "border-indigo-100", "text-indigo-700");
+            } else if (tone === "warning") {
+                el.classList.add("bg-amber-50", "border", "border-amber-200", "text-amber-800");
             } else {
                 el.classList.add("bg-rose-50", "border", "border-rose-100", "text-rose-700");
             }
@@ -2450,6 +2581,7 @@ outline-offset: 2px;
             updateUserProfile();
             connectSSE();
             startTokenRefreshTimer();
+            startInactivityTracking();
             openAppShell();
             navigate("home");
             maybeShowRoleBanner();
@@ -2552,6 +2684,7 @@ outline-offset: 2px;
                     updateUserProfile();
                     connectSSE();
                     startTokenRefreshTimer();
+                    startInactivityTracking();
                     openAppShell();
                     navigate("home");
                     showAppMessage(`Welcome to PhishGuard! Your account has been created as ${role}.`, "success");
@@ -2634,6 +2767,7 @@ outline-offset: 2px;
 
         async function logout() {
             // Clear all background timers and intervals before wiping state.
+            stopInactivityTracking();
             if (window._tokenRefreshTimer) { clearInterval(window._tokenRefreshTimer); window._tokenRefreshTimer = null; }
             if (exportPollInterval) { clearInterval(exportPollInterval); exportPollInterval = null; }
             _activeExportSession = false;
@@ -4629,6 +4763,9 @@ outline-offset: 2px;
             // ── Synchronous event listeners (set up before any await) ──────
             document.addEventListener("keydown", event => {
                 if (event.key === "Escape") {
+                    // Inactivity warning: Escape = "I'm still here" (reset timer, stay logged in).
+                    const inactivityWarning = document.getElementById('inactivity-warning');
+                    if (inactivityWarning && inactivityWarning.style.display === 'flex') { resetInactivityTimer(); return; }
                     const modal = document.getElementById('user-action-modal');
                     if (modal && modal.style.display === 'flex') { closeUserModal(); return; }
                     closeSidebar();
@@ -4663,6 +4800,7 @@ outline-offset: 2px;
             if (sessionRestored) {
                 // Valid session — go straight to the dashboard.
                 startTokenRefreshTimer();
+                startInactivityTracking();
                 connectSSE();
                 document.getElementById("app-layout").classList.remove("hidden");
                 navigate("home");
