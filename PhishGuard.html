@@ -3345,8 +3345,6 @@ outline-offset: 2px;
             const cbTh = document.getElementById('email-cb-th');
             if (cbTh) cbTh.style.display = isAdmin ? '' : 'none';
 
-            // Reset selection state on every re-render.
-            _selectedEmailIds.clear();
             const toolbar = document.getElementById('email-bulk-toolbar');
             if (toolbar) toolbar.style.display = 'none';
 
@@ -3526,41 +3524,50 @@ outline-offset: 2px;
             );
         }
 
-        function bulkDeleteSelectedEmails() {
+        async function bulkDeleteSelectedEmails() {
             const ids = Array.from(_selectedEmailIds);
-            if (!ids.length) return;
-            showConfirmModal(
-                `Delete ${ids.length} Email${ids.length !== 1 ? 's' : ''}?`,
-                `Permanently delete ${ids.length} selected email${ids.length !== 1 ? 's' : ''} and all their analysis data?\n\nThis cannot be undone.`,
-                `Delete ${ids.length} Email${ids.length !== 1 ? 's' : ''}`,
-                '#ef4444',
-                async () => {
-                    try {
-                        const res = await apiFetch('/emails/bulk', {
-                            method: 'DELETE',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ email_ids: ids })
-                        });
-                        if (!res) return;
-                        if (res.ok) {
-                            const data = await res.json();
-                            ids.forEach(id => {
-                                const row = document.getElementById(`email-row-${id}`);
-                                if (row) {
-                                    row.style.transition = 'opacity 0.2s';
-                                    row.style.opacity    = '0';
-                                    setTimeout(() => row.remove(), 200);
-                                }
-                            });
-                            clearEmailSelection();
-                            showAppMessage(`${data.deleted_count} email${data.deleted_count !== 1 ? 's' : ''} deleted.`);
-                        } else {
-                            const err = await res.json().catch(() => ({}));
-                            showAppMessage(err?.detail || 'Bulk delete failed.');
+            if (!ids.length) {
+                console.log('[bulkDelete] No emails selected');
+                return;
+            }
+            console.log('[bulkDelete] Deleting IDs:', ids);
+
+            if (!confirm(`Delete ${ids.length} email${ids.length !== 1 ? 's' : ''} permanently?\n\nThis cannot be undone.`)) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/emails/bulk`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${window.authToken}`
+                    },
+                    body: JSON.stringify({ email_ids: ids })
+                });
+
+                console.log('[bulkDelete] Response status:', res.status);
+
+                if (res.ok) {
+                    const data = await res.json().catch(() => ({ deleted_count: ids.length }));
+                    ids.forEach(id => {
+                        const row = document.getElementById(`email-row-${id}`);
+                        if (row) {
+                            row.style.transition = 'opacity 0.2s';
+                            row.style.opacity    = '0';
+                            setTimeout(() => row.remove(), 200);
                         }
-                    } catch (err) { showAppMessage(`Error: ${err.message}`); }
+                    });
+                    clearEmailSelection();
+                    showAppMessage(`${data.deleted_count} email${data.deleted_count !== 1 ? 's' : ''} deleted.`);
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    console.error('[bulkDelete] Failed:', res.status, err);
+                    showAppMessage(`Delete failed: ${res.status} — ${err?.detail || 'Unknown error'}`);
                 }
-            );
+            } catch (err) {
+                console.error('[bulkDelete] Error:', err);
+                showAppMessage(`Error: ${err.message}`);
+            }
         }
 
         function handleEmailRowKeydown(event, emailId) {
