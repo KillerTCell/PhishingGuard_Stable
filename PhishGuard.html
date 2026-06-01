@@ -1034,8 +1034,8 @@ outline-offset: 2px;
                                 <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                                     <h3 class="text-sm font-semibold text-slate-900 mb-4">Analyst Actions</h3>
                                     <div class="space-y-3">
-                                        <button type="button" onclick="handleAction('confirmed')" class="w-full h-11 bg-slate-900 text-white font-medium rounded-xl shadow-sm hover:bg-slate-800 transition-colors text-sm flex justify-center items-center">
-                                            <iconify-icon icon="solar:check-read-linear" class="mr-2 text-lg"></iconify-icon> Confirm Phishing (Delete)
+                                        <button type="button" onclick="handleAction('confirmed')" class="w-full h-11 bg-rose-600 text-white font-medium rounded-xl shadow-sm hover:bg-rose-700 transition-colors text-sm flex justify-center items-center">
+                                            <iconify-icon icon="solar:check-read-linear" class="mr-2 text-lg"></iconify-icon> Confirm Phishing
                                         </button>
                                         <button type="button" onclick="handleAction('investigate')" class="w-full h-11 bg-white text-slate-700 border border-slate-200 font-medium rounded-xl hover:bg-slate-50 transition-colors text-sm flex justify-center items-center">
                                             <iconify-icon icon="solar:magnifer-linear" class="mr-2 text-lg"></iconify-icon> Needs Investigation
@@ -1453,19 +1453,36 @@ outline-offset: 2px;
                                 <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                     <div>
                                         <h2 class="text-base font-semibold text-slate-900">High-risk messages</h2>
-                                        <p class="text-xs text-slate-500 mt-0.5">Confirm phishing, release to inbox, or escalate for investigation.</p>
+                                        <p class="text-xs text-slate-500 mt-0.5">Confirm phishing, release to inbox, or flag for investigation. Admin can bulk-select and delete.</p>
                                     </div>
                                     <span id="quarantine-queue-count" class="inline-flex items-center self-start sm:self-auto bg-rose-50 text-rose-700 border border-rose-100 text-xs font-semibold px-2.5 py-1 rounded-full">0 in queue</span>
                                 </div>
+
+                                <!-- Bulk action toolbar — admin only, shown when rows are checked -->
+                                <div id="quarantine-bulk-toolbar" style="display:none" class="items-center justify-between flex-wrap gap-2 px-5 py-3 bg-indigo-50 border-b border-indigo-100">
+                                    <div class="flex items-center gap-3">
+                                        <span id="quarantine-selected-count" class="text-sm font-semibold text-indigo-900">0 selected</span>
+                                        <button onclick="clearQuarantineSelection()" class="text-xs text-slate-500 cursor-pointer underline" style="background:none;border:none">Clear</button>
+                                    </div>
+                                    <div class="flex gap-2 flex-wrap">
+                                        <button onclick="bulkConfirmPhishing()" style="padding:6px 14px;background:#ef4444;border:none;border-radius:8px;font-size:12px;font-weight:600;color:white;cursor:pointer">✓ Confirm All as Phishing</button>
+                                        <button onclick="bulkRelease()" style="padding:6px 14px;background:#16a34a;border:none;border-radius:8px;font-size:12px;font-weight:600;color:white;cursor:pointer">↑ Release All</button>
+                                        <button onclick="bulkQuarantineDelete()" style="padding:6px 14px;background:white;border:1px solid #fca5a5;border-radius:8px;font-size:12px;font-weight:500;color:#ef4444;cursor:pointer">🗑 Delete Selected</button>
+                                    </div>
+                                </div>
+
                                 <div class="overflow-x-auto">
-                                    <table class="w-full text-left border-collapse min-w-[640px]">
+                                    <table class="w-full text-left border-collapse min-w-[820px]">
                                         <thead>
                                             <tr class="bg-slate-50/50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                                                <th id="quarantine-cb-th" scope="col" class="px-3 py-3" style="display:none">
+                                                    <input type="checkbox" id="quarantine-select-all" onchange="toggleAllQuarantineCheckboxes(this.checked)" class="cursor-pointer">
+                                                </th>
                                                 <th scope="col" class="px-5 py-3">Sender</th>
                                                 <th scope="col" class="px-5 py-3">Subject</th>
                                                 <th scope="col" class="px-5 py-3">Risk</th>
                                                 <th scope="col" class="px-5 py-3">Received</th>
-                                                <th scope="col" class="px-5 py-3 text-right">Action</th>
+                                                <th scope="col" class="px-5 py-3">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody id="quarantine-queue-body" class="divide-y divide-slate-100 text-sm"></tbody>
@@ -2255,6 +2272,7 @@ outline-offset: 2px;
         let systemUsersState = [];
         let currentDigestItems = [];
         let conversationHistory = [];
+        let _selectedQuarantineIds = new Set();
         let toastTimer = null;
         let currentExportJobId   = null;
         let currentExportFormat  = null;   // format stored at submit time (not the dropdown's current value)
@@ -2846,12 +2864,9 @@ outline-offset: 2px;
             const countEl = document.getElementById("quarantine-queue-count");
             if (!tbody) return;
 
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="5" class="px-5 py-8 text-center text-slate-500 text-sm">
-                        <iconify-icon icon="solar:spinner-linear" class="animate-spin text-lg align-middle mr-2"></iconify-icon>Loading...
-                    </td>
-                </tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="px-5 py-8 text-center text-slate-500 text-sm">
+                <iconify-icon icon="solar:spinner-linear" class="animate-spin text-lg align-middle mr-2"></iconify-icon>Loading...
+            </td></tr>`;
 
             let items = [], totalCount = 0;
             try {
@@ -2866,45 +2881,284 @@ outline-offset: 2px;
             if (countEl) countEl.textContent = `${totalCount} in queue`;
             setText("quarantine-count-badge", formatNumber(totalCount));
 
+            // Show/hide admin-only checkbox column header.
+            const isAdmin = currentUser?.role === 'Admin';
+            const cbTh = document.getElementById('quarantine-cb-th');
+            if (cbTh) cbTh.style.display = isAdmin ? '' : 'none';
+
+            // Reset bulk selection state on re-render.
+            _selectedQuarantineIds.clear();
+            const toolbar = document.getElementById('quarantine-bulk-toolbar');
+            if (toolbar) toolbar.style.display = 'none';
+
             if (!items.length) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="px-5 py-12 text-center">
-                            <iconify-icon icon="solar:shield-check-linear" class="text-4xl text-emerald-400 block mx-auto mb-3"></iconify-icon>
-                            <p class="text-slate-700 font-medium mb-1">Queue is clear</p>
-                            <p class="text-slate-500 text-xs">No emails are currently quarantined. New threats will appear here automatically.</p>
-                        </td>
-                    </tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="px-5 py-12 text-center">
+                    <iconify-icon icon="solar:shield-check-linear" class="text-4xl text-emerald-400 block mx-auto mb-3"></iconify-icon>
+                    <p class="text-slate-700 font-medium mb-1">Queue is clear</p>
+                    <p class="text-slate-500 text-xs">No emails are currently quarantined. New threats will appear here automatically.</p>
+                </td></tr>`;
                 return;
             }
 
-            tbody.innerHTML = items.map(email => `
-                <tr class="hover:bg-slate-50/50 transition-colors cursor-pointer" tabindex="0" role="button"
-                    aria-label="Open ${escapeHtml(email.subject || '')}"
-                    onclick="openEmailDetail('${email.id}')"
-                    onkeydown="handleEmailRowKeydown(event, '${email.id}')">
-                    <td class="px-5 py-4 max-w-xs">
+            const trashSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3,6 5,6 21,6"/><path d="M19,6l-1,14H6L5,6"/><path d="M9,6V4h6v2"/></svg>`;
+
+            tbody.innerHTML = items.map(email => {
+                const safeId      = escapeHtml(email.id);
+                const safeSender  = JSON.stringify(email.sender  || '');
+                const safeSubject = JSON.stringify(email.subject || '');
+                const fbBadge = email.feedback_state
+                    ? `<span class="q-feedback-badge ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-100">${escapeHtml(capitalize(email.feedback_state))}</span>`
+                    : '';
+                const cbCell = isAdmin
+                    ? `<td class="px-3 py-4"><input type="checkbox" class="quarantine-select-checkbox cursor-pointer" data-email-id="${safeId}" onchange="updateQuarantineBulkToolbar()"></td>`
+                    : '';
+                const trashBtn = isAdmin
+                    ? `<button onclick="event.stopPropagation();confirmQuarantineDelete('${safeId}',${safeSender},${safeSubject})"
+                          title="Permanently delete this email"
+                          style="width:26px;height:26px;background:transparent;border:1px solid #fca5a5;color:#ef4444;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">${trashSvg}</button>`
+                    : '';
+                return `
+                <tr id="quarantine-row-${safeId}" class="quarantine-row hover:bg-slate-50/50 transition-colors">
+                    ${cbCell}
+                    <td class="px-5 py-4 max-w-xs cursor-pointer" onclick="openEmailDetail('${safeId}')">
                         <div class="font-medium text-slate-900 truncate">${escapeHtml(email.sender || '(unknown)')}</div>
                     </td>
-                    <td class="px-5 py-4 max-w-md">
-                        <div class="text-slate-700 truncate">${escapeHtml(email.subject || '(no subject)')}</div>
-                        <div class="text-xs text-slate-500 truncate mt-0.5">${escapeHtml(email.top_reason || "")}</div>
+                    <td class="px-5 py-4 max-w-sm cursor-pointer" onclick="openEmailDetail('${safeId}')">
+                        <div class="text-slate-700 truncate">${escapeHtml(email.subject || '(no subject)')}${fbBadge}</div>
+                        <div class="text-xs text-slate-500 truncate mt-0.5">${escapeHtml(email.top_reason || '')}</div>
                     </td>
-                    <td class="px-5 py-4">
+                    <td class="px-5 py-4 cursor-pointer" onclick="openEmailDetail('${safeId}')">
                         <div class="flex items-center font-semibold ${getRiskTextClass(email.risk_score ?? 0)}">
                             ${email.risk_score ?? '—'}<span class="text-slate-400 text-xs font-normal ml-1">/100</span>
                         </div>
                     </td>
-                    <td class="px-5 py-4 text-slate-500 text-sm whitespace-nowrap">${escapeHtml(formatReceived(email.received_at))}</td>
-                    <td class="px-5 py-4 text-right">
-                        <button type="button" onclick="event.stopPropagation(); openEmailDetail('${email.id}')"
-                                title="Open email detail to confirm phishing, release to inbox, or escalate for investigation"
-                                class="text-indigo-600 hover:text-indigo-800 font-medium text-xs px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 transition-colors">
-                            Review →
-                        </button>
+                    <td class="px-5 py-4 text-slate-500 text-sm whitespace-nowrap cursor-pointer" onclick="openEmailDetail('${safeId}')">
+                        ${escapeHtml(formatReceived(email.received_at))}
                     </td>
-                </tr>
-            `).join("");
+                    <td class="px-5 py-4">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <button onclick="event.stopPropagation();confirmPhishingAction('${safeId}')"
+                                title="Confirm as phishing — keeps email as ML training data"
+                                style="padding:5px 10px;background:#ef4444;color:white;border:none;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">
+                                ✓ Phishing
+                            </button>
+                            <button onclick="event.stopPropagation();releaseEmailAction('${safeId}')"
+                                title="Mark as safe and release to inbox"
+                                style="padding:5px 10px;background:#16a34a;color:white;border:none;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">
+                                ↑ Release
+                            </button>
+                            <button onclick="event.stopPropagation();markForInvestigationAction('${safeId}')"
+                                title="Flag for further investigation"
+                                style="padding:5px 10px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;white-space:nowrap">
+                                ? Review
+                            </button>
+                            ${trashBtn}
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        // ── Quarantine queue helpers ─────────────────────────────────────────
+
+        function removeQuarantineRow(emailId) {
+            const row = document.getElementById(`quarantine-row-${emailId}`);
+            if (!row) return;
+            row.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(-8px)';
+            setTimeout(() => {
+                row.remove();
+                if (!document.querySelector('.quarantine-row')) {
+                    const tbody = document.getElementById('quarantine-queue-body');
+                    if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="px-5 py-12 text-center">
+                        <iconify-icon icon="solar:shield-check-linear" class="text-4xl text-emerald-400 block mx-auto mb-3"></iconify-icon>
+                        <p class="text-slate-700 font-medium mb-1">Queue is clear</p>
+                        <p class="text-slate-500 text-xs">No emails are currently quarantined.</p>
+                    </td></tr>`;
+                }
+            }, 260);
+        }
+
+        function _updateQuarantineCount(delta) {
+            const badge   = document.getElementById('quarantine-count-badge');
+            const countEl = document.getElementById('quarantine-queue-count');
+            if (badge) {
+                const curr   = parseInt(badge.textContent.replace(/,/g, ''), 10) || 0;
+                const newVal = Math.max(0, curr + delta);
+                badge.textContent = formatNumber(newVal);
+            }
+            if (countEl) {
+                const curr   = parseInt(countEl.textContent, 10) || 0;
+                const newVal = Math.max(0, curr + delta);
+                countEl.textContent = `${newVal} in queue`;
+            }
+        }
+
+        // ── Single-item analyst actions ──────────────────────────────────────
+
+        async function confirmPhishingAction(emailId) {
+            try {
+                const resp = await apiFetch(`/quarantine/${emailId}/confirm`, { method: 'POST' });
+                if (!resp || !resp.ok) throw new Error('API error');
+                removeQuarantineRow(emailId);
+                _updateQuarantineCount(-1);
+                showAppMessage('Confirmed as phishing — saved for ML training.');
+            } catch (_) { showAppMessage('Could not confirm phishing. Please try again.'); }
+        }
+
+        async function releaseEmailAction(emailId) {
+            try {
+                const resp = await apiFetch(`/quarantine/${emailId}/release`, { method: 'POST' });
+                if (!resp || !resp.ok) throw new Error('API error');
+                removeQuarantineRow(emailId);
+                _updateQuarantineCount(-1);
+                showAppMessage('Email released to inbox.');
+            } catch (_) { showAppMessage('Could not release email. Please try again.'); }
+        }
+
+        async function markForInvestigationAction(emailId) {
+            try {
+                const resp = await apiFetch(`/quarantine/${emailId}/investigate`, { method: 'POST' });
+                if (!resp || !resp.ok) throw new Error('API error');
+                // Email stays in the queue — update its feedback badge in-place.
+                const row = document.getElementById(`quarantine-row-${emailId}`);
+                if (row) {
+                    let badge = row.querySelector('.q-feedback-badge');
+                    if (!badge) {
+                        // Append to the subject cell text
+                        const subjCell = row.querySelector('td:nth-child(2)');
+                        if (subjCell) {
+                            badge = document.createElement('span');
+                            badge.className = 'q-feedback-badge ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium';
+                            subjCell.querySelector('div')?.appendChild(badge);
+                        }
+                    }
+                    if (badge) {
+                        badge.textContent = 'Under Review';
+                        badge.style.background   = '#fef3c7';
+                        badge.style.color        = '#92400e';
+                        badge.style.borderColor  = '#fcd34d';
+                        badge.style.display      = 'inline-flex';
+                    }
+                }
+                showAppMessage('Flagged for further investigation.');
+            } catch (_) { showAppMessage('Could not flag email. Please try again.'); }
+        }
+
+        function confirmQuarantineDelete(emailId, sender, subject) {
+            showConfirmModal({
+                title: 'Delete quarantined email?',
+                message: `From: ${sender || 'Unknown'}\nSubject: ${subject || 'No subject'}\n\nThis permanently removes the email and all analysis data.\n\nConsider "✓ Phishing" instead — confirmed emails are saved as valuable ML training data.`,
+                confirmText: 'Delete Permanently',
+                confirmColor: '#ef4444',
+                onConfirm: async () => {
+                    try {
+                        const resp = await apiFetch(`/emails/${emailId}`, { method: 'DELETE' });
+                        if (!resp || (!resp.ok && resp.status !== 204)) throw new Error('Failed');
+                        removeQuarantineRow(emailId);
+                        _updateQuarantineCount(-1);
+                        showAppMessage('Email permanently deleted.');
+                    } catch (_) { showAppMessage('Delete failed. Please try again.'); }
+                }
+            });
+        }
+
+        // ── Bulk toolbar ─────────────────────────────────────────────────────
+
+        function toggleAllQuarantineCheckboxes(checked) {
+            document.querySelectorAll('.quarantine-select-checkbox').forEach(cb => { cb.checked = checked; });
+            updateQuarantineBulkToolbar();
+        }
+
+        function updateQuarantineBulkToolbar() {
+            const checked = Array.from(document.querySelectorAll('.quarantine-select-checkbox:checked'));
+            _selectedQuarantineIds.clear();
+            checked.forEach(cb => _selectedQuarantineIds.add(cb.dataset.emailId));
+            const count   = _selectedQuarantineIds.size;
+            const countEl = document.getElementById('quarantine-selected-count');
+            if (countEl) countEl.textContent = `${count} email${count !== 1 ? 's' : ''} selected`;
+            const toolbar = document.getElementById('quarantine-bulk-toolbar');
+            if (toolbar) toolbar.style.display = count > 0 ? 'flex' : 'none';
+        }
+
+        function clearQuarantineSelection() {
+            document.querySelectorAll('.quarantine-select-checkbox').forEach(cb => { cb.checked = false; });
+            const selectAll = document.getElementById('quarantine-select-all');
+            if (selectAll) selectAll.checked = false;
+            _selectedQuarantineIds.clear();
+            updateQuarantineBulkToolbar();
+        }
+
+        async function bulkConfirmPhishing() {
+            const ids = Array.from(_selectedQuarantineIds);
+            if (!ids.length) return;
+            showConfirmModal({
+                title: `Confirm ${ids.length} email${ids.length !== 1 ? 's' : ''} as phishing?`,
+                message: `This marks all ${ids.length} selected email${ids.length !== 1 ? 's' : ''} as confirmed phishing and saves them as ML training data.`,
+                confirmText: `Confirm ${ids.length} as Phishing`,
+                confirmColor: '#ef4444',
+                onConfirm: async () => {
+                    let n = 0;
+                    await Promise.all(ids.map(async id => {
+                        try {
+                            const r = await apiFetch(`/quarantine/${id}/confirm`, { method: 'POST' });
+                            if (r && r.ok) { removeQuarantineRow(id); n++; }
+                        } catch (_) {}
+                    }));
+                    clearQuarantineSelection();
+                    _updateQuarantineCount(-n);
+                    showAppMessage(`${n} email${n !== 1 ? 's' : ''} confirmed as phishing.`);
+                }
+            });
+        }
+
+        async function bulkRelease() {
+            const ids = Array.from(_selectedQuarantineIds);
+            if (!ids.length) return;
+            showConfirmModal({
+                title: `Release ${ids.length} email${ids.length !== 1 ? 's' : ''}?`,
+                message: `This marks all ${ids.length} selected email${ids.length !== 1 ? 's' : ''} as safe and releases them to the inbox.`,
+                confirmText: `Release ${ids.length} Email${ids.length !== 1 ? 's' : ''}`,
+                confirmColor: '#16a34a',
+                icon: '↑',
+                iconBg: '#dcfce7',
+                onConfirm: async () => {
+                    let n = 0;
+                    await Promise.all(ids.map(async id => {
+                        try {
+                            const r = await apiFetch(`/quarantine/${id}/release`, { method: 'POST' });
+                            if (r && r.ok) { removeQuarantineRow(id); n++; }
+                        } catch (_) {}
+                    }));
+                    clearQuarantineSelection();
+                    _updateQuarantineCount(-n);
+                    showAppMessage(`${n} email${n !== 1 ? 's' : ''} released to inbox.`);
+                }
+            });
+        }
+
+        async function bulkQuarantineDelete() {
+            const ids = Array.from(_selectedQuarantineIds);
+            if (!ids.length) return;
+            showConfirmModal({
+                title: `Delete ${ids.length} quarantined email${ids.length !== 1 ? 's' : ''}?`,
+                message: `This permanently removes ${ids.length} email${ids.length !== 1 ? 's' : ''} and ALL their analysis data.\n\nConsider "Confirm All as Phishing" instead — confirmed emails are saved as valuable ML training data.`,
+                confirmText: `Delete ${ids.length} Permanently`,
+                confirmColor: '#ef4444',
+                onConfirm: async () => {
+                    let n = 0;
+                    await Promise.all(ids.map(async id => {
+                        try {
+                            const r = await apiFetch(`/emails/${id}`, { method: 'DELETE' });
+                            if (r && (r.ok || r.status === 204)) { removeQuarantineRow(id); n++; }
+                        } catch (_) {}
+                    }));
+                    clearQuarantineSelection();
+                    _updateQuarantineCount(-n);
+                    showAppMessage(`${n} email${n !== 1 ? 's' : ''} permanently deleted.`);
+                }
+            });
         }
 
         function updateRoleBasedNavigation() {
@@ -4359,6 +4613,29 @@ outline-offset: 2px;
             const modal = document.getElementById('user-action-modal');
             if (modal) modal.style.display = 'none';
             _modalConfirmHandler = null;
+        }
+
+        // Generic confirmation modal — reuses #user-action-modal.
+        // Used by quarantine delete/bulk actions.
+        function showConfirmModal({ title, message, confirmText = 'Confirm',
+                                    confirmColor = '#ef4444', icon = '⚠️',
+                                    iconBg = '#fee2e2', onConfirm }) {
+            const modal      = document.getElementById('user-action-modal');
+            const iconEl     = document.getElementById('modal-icon');
+            const titleEl    = document.getElementById('modal-title');
+            const msgEl      = document.getElementById('modal-message');
+            const confirmBtn = document.getElementById('modal-confirm');
+            if (!modal) { if (window.confirm(`${title}\n\n${message}`)) onConfirm(); return; }
+            if (iconEl)  { iconEl.style.background = iconBg; iconEl.textContent = icon; }
+            if (titleEl) titleEl.textContent = title;
+            if (msgEl)   { msgEl.style.whiteSpace = 'pre-line'; msgEl.textContent = message; }
+            if (confirmBtn) {
+                confirmBtn.style.background = confirmColor;
+                confirmBtn.textContent      = confirmText;
+            }
+            _modalConfirmHandler = onConfirm;
+            if (confirmBtn) confirmBtn.onclick = () => { closeUserModal(); if (_modalConfirmHandler) _modalConfirmHandler(); };
+            modal.style.display = 'flex';
         }
 
         async function _doToggleUser(userId, activate) {
