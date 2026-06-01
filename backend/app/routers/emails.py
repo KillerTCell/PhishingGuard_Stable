@@ -1,9 +1,10 @@
 """Section 4.2 -- FR-02, UC-02, UC-03: Email list and detail endpoints.
 
-POST   /emails/upload   -- .eml file upload (≤5 MB)
+POST   /emails/upload   -- .eml file upload (≤5 MB, up to 20 files)
 GET    /emails          -- paginated list with risk_band filter (A-07)
 GET    /emails/{id}     -- full detail with NLP features
 DELETE /emails/{id}     -- hard delete (admin only, Privacy Act erasure)
+DELETE /emails/bulk     -- hard delete multiple emails (admin only, max 100)
 """
 from __future__ import annotations
 
@@ -11,10 +12,12 @@ import math
 import os
 import tempfile
 import uuid
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from pydantic import BaseModel
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -210,6 +213,92 @@ async def upload_emails(
         total_queued=len(queued),
         total_errors=len(errors),
     )
+
+
+# ---------------------------------------------------------------------------
+# DELETE /emails/bulk  (Admin only — hard delete up to 100 emails)
+# ---------------------------------------------------------------------------
+
+
+class BulkDeleteRequest(BaseModel):
+    """Request body for DELETE /emails/bulk."""
+    email_ids: List[str]
+
+
+@router.delete(
+    "/emails/bulk",
+    status_code=status.HTTP_200_OK,
+    summary="Hard delete multiple emails (admin only, max 100)",
+)
+async def bulk_delete_emails(
+    payload: BulkDeleteRequest,
+    request: Request,
+    current_user: CurrentUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Permanently delete up to 100 emails owned by the caller's organisation.
+
+    Body: ``{"email_ids": ["uuid1", "uuid2", ...]}``
+
+    Returns ``{"deleted_count": N}`` on success.
+    Silently skips IDs that don't belong to this org (no 404).
+    """
+    raw_ids: list[str] = payload.email_ids
+    if not raw_ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="email_ids is required and must not be empty",
+        )
+    if len(raw_ids) > 100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Maximum 100 emails per bulk delete request",
+        )
+    try:
+        uuid_list = [uuid.UUID(str(i)) for i in raw_ids]
+    except (ValueError, AttributeError):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid email ID format — must be UUID strings",
+        )
+
+    # Restrict to this org (multi-tenant isolation).
+    matching = (
+        await db.execute(
+            select(Email.id).where(
+                Email.id.in_(uuid_list),
+                Email.org_id == current_user.org_id,
+            )
+        )
+    ).scalars().all()
+
+    if not matching:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No matching emails found in your organisation",
+        )
+
+    await audit_service.write_audit_log(
+        db,
+        org_id=current_user.org_id,
+        user_id=current_user.id,
+        action="bulk_email_deleted",
+        target_type="email",
+        ip_address=request.client.host if request and request.client else None,
+        request_id=request.headers.get("x-request-id") if request else None,
+        detail={"deleted_count": len(matching), "email_ids": [str(i) for i in matching]},
+    )
+
+    await db.execute(
+        sa_delete(Email).where(Email.id.in_(matching))
+    )
+
+    logger.info(
+        "bulk_email_deleted",
+        count=len(matching),
+        org_id=str(current_user.org_id),
+    )
+    return {"deleted_count": len(matching)}
 
 
 # ---------------------------------------------------------------------------

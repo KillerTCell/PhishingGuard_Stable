@@ -3560,9 +3560,22 @@ outline-offset: 2px;
                     clearEmailSelection();
                     showAppMessage(`${data.deleted_count} email${data.deleted_count !== 1 ? 's' : ''} deleted.`);
                 } else {
-                    const err = await res.json().catch(() => ({}));
-                    console.error('[bulkDelete] Failed:', res.status, err);
-                    showAppMessage(`Delete failed: ${res.status} — ${err?.detail || 'Unknown error'}`);
+                    let errorDetail = 'Unknown error';
+                    try {
+                        const errData = await res.json();
+                        console.error('[bulkDelete] Full error response:', errData);
+                        const d = errData?.detail;
+                        if (Array.isArray(d)) {
+                            // Pydantic v2 validation error — array of {loc, msg, type}
+                            errorDetail = d.map(e => e.msg || JSON.stringify(e)).join('; ');
+                        } else if (typeof d === 'string') {
+                            errorDetail = d;
+                        } else if (d) {
+                            errorDetail = JSON.stringify(d);
+                        }
+                    } catch (_) {}
+                    console.error(`[bulkDelete] ${res.status}: ${errorDetail}`);
+                    showAppMessage(`Delete failed (${res.status}): ${errorDetail}`);
                 }
             } catch (err) {
                 console.error('[bulkDelete] Error:', err);
