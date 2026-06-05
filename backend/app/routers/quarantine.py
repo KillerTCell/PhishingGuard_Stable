@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import sign_digest_token
 from app.dependencies import CurrentUser, get_current_user, get_db, get_redis, require_admin
+from app.services.notification_service import push_notification
 from app.models.analysis_result import AnalysisResult
 from app.models.audit_log import AuditLog
 from app.models.email import Email
@@ -416,6 +417,13 @@ async def confirm_phishing(
         current_user.org_id,
         {"type": "scan_complete", "email_id": str(email_id), "status": "confirmed_phishing"},
     )
+    await push_notification(
+        redis, str(current_user.org_id),
+        "email_actioned",
+        "Email Confirmed as Phishing",
+        f"Email from {email.sender or '(unknown)'} confirmed as phishing and saved for ML training.",
+        "danger",
+    )
     return QuarantineActionResponse(status=EmailStatus.confirmed_phishing)
 
 
@@ -463,6 +471,13 @@ async def release_email(
         current_user.org_id,
         {"type": "scan_complete", "email_id": str(email_id), "status": "delivered"},
     )
+    await push_notification(
+        redis, str(current_user.org_id),
+        "email_actioned",
+        "Email Released to Inbox",
+        f"Email from {email.sender or '(unknown)'} marked as safe and released.",
+        "success",
+    )
     return QuarantineActionResponse(status=EmailStatus.delivered)
 
 
@@ -481,6 +496,7 @@ async def flag_for_investigation(
     request: Request,
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
 ) -> QuarantineActionResponse:
     """Insert a 'needs_investigation' feedback row.  Email status stays quarantined."""
     email = (
@@ -502,6 +518,13 @@ async def flag_for_investigation(
     )
     await _write_audit(db, "email_flagged_investigation", current_user, request, email_id)
     await db.commit()
+    await push_notification(
+        redis, str(current_user.org_id),
+        "email_actioned",
+        "Email Flagged for Investigation",
+        f"Email from {email.sender or '(unknown)'} flagged for further review.",
+        "warning",
+    )
     return QuarantineActionResponse(status=EmailStatus.quarantined)
 
 

@@ -415,9 +415,9 @@ outline-offset: 2px;
                     </div>
                 </div>
                 <div class="flex items-center space-x-3 sm:space-x-5">
-                    <button type="button" aria-label="Notifications" onclick="showAppMessage('No new notifications.')" class="relative text-slate-400 hover:text-slate-600 transition-colors p-1.5 rounded-lg hover:bg-slate-50">
+                    <button type="button" id="notification-bell" aria-label="Notifications" onclick="toggleNotificationPanel()" class="relative text-slate-400 hover:text-slate-600 transition-colors p-1.5 rounded-lg hover:bg-slate-50">
                         <iconify-icon icon="solar:bell-linear" class="text-xl" stroke-width="1.5"></iconify-icon>
-                        <span class="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+                        <span id="notification-badge" style="display:none;position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 3px;background:#ef4444;color:white;border-radius:8px;font-size:9px;font-weight:700;align-items:center;justify-content:center;border:2px solid white;line-height:1"></span>
                     </button>
                     <button type="button" onclick="navigate('analyse-email')" class="bg-slate-900 text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium flex items-center hover:bg-slate-800 transition-colors shadow-sm active:scale-95">
                         <iconify-icon icon="solar:add-circle-linear" class="mr-2 text-base" stroke-width="1.5"></iconify-icon>
@@ -432,6 +432,19 @@ outline-offset: 2px;
                 <div class="max-w-7xl mx-auto">
                     <div id="app-status" class="sr-only" aria-live="polite"></div>
                     <div id="app-toast" class="hidden fixed bottom-4 right-4 z-50 max-w-sm bg-white border border-slate-200 rounded-xl shadow-lg px-4 py-3 text-sm text-slate-700" role="status" aria-live="polite"></div>
+
+                    <!-- Notification panel — toggled by bell button -->
+                    <div id="notification-panel" style="display:none;position:fixed;top:60px;right:16px;width:360px;max-height:480px;background:white;border-radius:14px;border:1px solid #e5e7eb;box-shadow:0 20px 50px rgba(0,0,0,0.15);z-index:9998;overflow:hidden;flex-direction:column;" role="dialog" aria-label="Notifications">
+                        <div style="padding:14px 16px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+                            <span style="font-size:14px;font-weight:600;color:#111827">Notifications</span>
+                            <button onclick="markAllNotificationsRead()" style="font-size:12px;color:#6b7280;background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:4px" title="Mark all as read">Mark all read</button>
+                        </div>
+                        <div id="notification-list" style="overflow-y:auto;flex:1;max-height:380px"></div>
+                        <div style="padding:10px 16px;border-top:1px solid #f3f4f6;text-align:center;flex-shrink:0">
+                            <button onclick="clearAllNotifications()" style="font-size:12px;color:#9ca3af;background:none;border:none;cursor:pointer">Clear all</button>
+                        </div>
+                    </div>
+
                     <!-- User action confirmation modal -->
                     <div id="user-action-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center" role="dialog" aria-modal="true" aria-labelledby="modal-title">
                       <div style="background:white;border-radius:16px;padding:28px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:modalIn 0.15s ease-out">
@@ -1995,25 +2008,43 @@ outline-offset: 2px;
             const type = data.type || data.event_type;
             if (!type) return;
             switch (type) {
+                case 'notification':
+                    // Typed notification event pushed by notification_service.py
+                    addNotification(data);
+                    break;
                 case 'scan_complete':
-                    // Always refresh dashboard stats in the background (update DOM even if hidden)
                     setTimeout(renderDashboard, 500);
-                    // Refresh email list if currently visible
                     if (currentPage === 'all-emails') renderEmailList();
-                    // Show notification
-                    showAppMessage(
-                        `Analysis complete: ${data.classification || 'processed'} — risk ${data.risk_score ?? 0}/100`
-                    );
+                    addNotification({
+                        event:     'scan_complete',
+                        title:     'Email Analysis Complete',
+                        message:   `${data.sender || 'Email'} — ${data.classification || 'processed'} (${data.risk_score ?? 0}/100)`,
+                        severity:  data.classification === 'phishing' ? 'danger'
+                                 : data.classification === 'suspicious' ? 'warning' : 'success',
+                        timestamp: new Date().toISOString(),
+                    });
                     break;
                 case 'quarantine_created':
                     if (currentPage === 'quarantine') { renderQuarantineQueue(); renderDigestPreview(); }
-                    // Always refresh dashboard so quarantine count stays current
                     setTimeout(renderDashboard, 500);
-                    showAppMessage('New threat quarantined.');
+                    addNotification({
+                        event:     'quarantine_created',
+                        title:     'Email Quarantined',
+                        message:   `${data.subject || 'Email'} quarantined for review`,
+                        severity:  'danger',
+                        timestamp: new Date().toISOString(),
+                    });
                     break;
                 case 'threshold_changed':
                     if (currentPage === 'settings') renderSettings();
                     setTimeout(renderDashboard, 500);
+                    addNotification({
+                        event:     'threshold_changed',
+                        title:     'Thresholds Updated',
+                        message:   'Detection thresholds changed by an admin',
+                        severity:  'warning',
+                        timestamp: new Date().toISOString(),
+                    });
                     break;
                 case 'forwarding_test_complete':
                     if (currentPage === 'forwarding-inbox') {
@@ -2023,8 +2054,14 @@ outline-offset: 2px;
                     }
                     break;
                 case 'imap_ingested':
-                    showAppMessage(`New forwarded email from ${data.sender || 'unknown'}`);
                     setTimeout(renderDashboard, 800);
+                    addNotification({
+                        event:     'imap_ingested',
+                        title:     'New Forwarded Email',
+                        message:   `Email from ${data.sender || 'unknown'} received`,
+                        severity:  'info',
+                        timestamp: new Date().toISOString(),
+                    });
                     break;
                 case 'digest_sent':
                     showAppMessage('Digest email sent successfully.');
@@ -2032,8 +2069,136 @@ outline-offset: 2px;
                 case 'export_ready':
                     if (data.job_id) showAppMessage('Export ready — visit Settings to download.');
                     if (currentPage === 'settings') renderDataExport();
+                    addNotification({
+                        event:     'export_ready',
+                        title:     'Export Ready',
+                        message:   data.message || 'Your export is ready to download',
+                        severity:  'success',
+                        timestamp: new Date().toISOString(),
+                    });
                     break;
             }
+        }
+
+        // =====================================================
+        // NOTIFICATION SYSTEM
+        // =====================================================
+
+        function toggleNotificationPanel() {
+            const panel = document.getElementById('notification-panel');
+            if (!panel) return;
+            const isOpen = panel.style.display === 'flex';
+            if (isOpen) {
+                panel.style.display = 'none';
+            } else {
+                panel.style.display = 'flex';
+                renderNotificationList();
+                markAllNotificationsRead();
+            }
+        }
+
+        // Close panel when clicking outside
+        document.addEventListener('click', (e) => {
+            const panel = document.getElementById('notification-panel');
+            const bell  = document.getElementById('notification-bell');
+            if (panel && bell &&
+                !panel.contains(e.target) &&
+                !bell.contains(e.target) &&
+                panel.style.display === 'flex') {
+                panel.style.display = 'none';
+            }
+        });
+
+        function addNotification(data) {
+            const notif = {
+                id:        Date.now() + Math.random(),
+                event:     data.event || data.type || 'notification',
+                title:     data.title   || 'Notification',
+                message:   data.message || '',
+                severity:  data.severity || 'info',
+                timestamp: data.timestamp || new Date().toISOString(),
+                read:      false,
+            };
+            window._notifications.unshift(notif);
+            if (window._notifications.length > 100) {
+                window._notifications = window._notifications.slice(0, 100);
+            }
+            window._unreadCount = window._notifications.filter(n => !n.read).length;
+            updateNotificationBadge();
+            // Re-render if panel is open
+            const panel = document.getElementById('notification-panel');
+            if (panel && panel.style.display === 'flex') renderNotificationList();
+        }
+
+        function renderNotificationList() {
+            const list = document.getElementById('notification-list');
+            if (!list) return;
+            if (!window._notifications.length) {
+                list.innerHTML = `<div style="padding:40px 20px;text-align:center;color:#9ca3af">
+                    <div style="font-size:32px;margin-bottom:8px">🔔</div>
+                    <p style="font-size:13px;font-weight:500;color:#6b7280;margin:0 0 4px">No notifications yet</p>
+                    <p style="font-size:12px;margin:0;color:#9ca3af;line-height:1.4">
+                        Email analysis, quarantine decisions,<br>and user changes will appear here.
+                    </p></div>`;
+                return;
+            }
+            const colors = {
+                danger:  { bg: '#fef2f2', dot: '#ef4444', icon: '🚨' },
+                warning: { bg: '#fffbeb', dot: '#f59e0b', icon: '⚠️' },
+                success: { bg: '#f0fdf4', dot: '#16a34a', icon: '✅' },
+                info:    { bg: '#eff6ff', dot: '#3b82f6', icon: 'ℹ️' },
+            };
+            list.innerHTML = window._notifications.slice(0, 50).map(n => {
+                const c    = colors[n.severity] || colors.info;
+                const time = formatNotifTime(n.timestamp);
+                return `<div style="padding:12px 16px;border-bottom:1px solid #f9fafb;background:${n.read ? 'white' : c.bg};display:flex;gap:10px;align-items:flex-start">
+                    <span style="font-size:16px;flex-shrink:0;margin-top:1px">${c.icon}</span>
+                    <div style="flex:1;min-width:0">
+                        <p style="font-size:13px;font-weight:600;color:#111827;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(n.title)}</p>
+                        <p style="font-size:12px;color:#6b7280;margin:0 0 4px;line-height:1.4">${escapeHtml(n.message)}</p>
+                        <p style="font-size:11px;color:#9ca3af;margin:0">${time}</p>
+                    </div>
+                    ${!n.read ? `<span style="width:8px;height:8px;border-radius:50%;background:${c.dot};flex-shrink:0;margin-top:4px;display:block"></span>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        function markAllNotificationsRead() {
+            window._notifications.forEach(n => { n.read = true; });
+            window._unreadCount = 0;
+            updateNotificationBadge();
+            renderNotificationList();
+            apiFetch('/notifications/read', { method: 'PATCH', body: JSON.stringify({}) }).catch(() => {});
+        }
+
+        function clearAllNotifications() {
+            window._notifications = [];
+            window._unreadCount   = 0;
+            updateNotificationBadge();
+            renderNotificationList();
+            const panel = document.getElementById('notification-panel');
+            if (panel) panel.style.display = 'none';
+        }
+
+        function updateNotificationBadge() {
+            const badge = document.getElementById('notification-badge');
+            if (!badge) return;
+            if (window._unreadCount > 0) {
+                badge.textContent  = window._unreadCount > 99 ? '99+' : String(window._unreadCount);
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        function formatNotifTime(isoString) {
+            try {
+                const diff = Math.floor((Date.now() - new Date(isoString)) / 1000);
+                if (diff < 60)    return 'Just now';
+                if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+                if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                return new Date(isoString).toLocaleDateString();
+            } catch { return 'Just now'; }
         }
 
         async function loginUser(credentials) {
@@ -2291,6 +2456,8 @@ outline-offset: 2px;
         let conversationHistory = [];
         let _selectedQuarantineIds = new Set();
         let _selectedEmailIds      = new Set();
+        window._notifications      = [];   // in-memory store, newest first (max 100)
+        window._unreadCount        = 0;
         let toastTimer = null;
         let currentExportJobId   = null;
         let currentExportFormat  = null;   // format stored at submit time (not the dropdown's current value)
@@ -2571,6 +2738,9 @@ outline-offset: 2px;
                 forwarding_address: user.forwarding_address,
             };
             updateUserProfile();
+            window._notifications = [];
+            window._unreadCount   = 0;
+            updateNotificationBadge();
             connectSSE();
             startTokenRefreshTimer();
             startInactivityTracking();
@@ -3053,6 +3223,7 @@ outline-offset: 2px;
                 removeQuarantineRow(emailId);
                 _updateQuarantineCount(-1);
                 showAppMessage('Confirmed as phishing — saved for ML training.');
+                addNotification({ event: 'email_actioned', title: 'Email Confirmed', message: 'Email confirmed as phishing and saved for ML training.', severity: 'danger', timestamp: new Date().toISOString() });
             } catch (_) { showAppMessage('Failed to confirm. Please try again.'); }
         }
 
@@ -3061,6 +3232,7 @@ outline-offset: 2px;
                 const resp = await apiFetch(`/quarantine/${emailId}/investigate`, { method: 'POST' });
                 if (!resp || !resp.ok) throw new Error('Failed');
                 showAppMessage('Flagged for further investigation.');
+                addNotification({ event: 'email_actioned', title: 'Email Flagged', message: 'Email flagged for further investigation.', severity: 'warning', timestamp: new Date().toISOString() });
             } catch (_) { showAppMessage('Failed. Please try again.'); }
         }
 
@@ -3071,6 +3243,7 @@ outline-offset: 2px;
                 removeQuarantineRow(emailId);
                 _updateQuarantineCount(-1);
                 showAppMessage('Email released to inbox.');
+                addNotification({ event: 'email_actioned', title: 'Email Released', message: 'Email marked as safe and released to inbox.', severity: 'success', timestamp: new Date().toISOString() });
             } catch (_) { showAppMessage('Failed to release. Please try again.'); }
         }
 
@@ -3530,6 +3703,7 @@ outline-offset: 2px;
                                 _updateQuarantineCount(-1);
                             }
                             showAppMessage('Email deleted.');
+                            addNotification({ event: 'email_deleted', title: 'Email Deleted', message: 'Email permanently removed.', severity: 'info', timestamp: new Date().toISOString() });
                         } else {
                             const err = await res.json().catch(() => ({}));
                             showAppMessage(err?.detail || err?.error?.message || 'Delete failed. Please try again.');
@@ -3574,6 +3748,7 @@ outline-offset: 2px;
                     });
                     clearEmailSelection();
                     showAppMessage(`${data.deleted_count} email${data.deleted_count !== 1 ? 's' : ''} deleted.`);
+                    addNotification({ event: 'bulk_deleted', title: `${data.deleted_count} Email${data.deleted_count !== 1 ? 's' : ''} Deleted`, message: `${data.deleted_count} email${data.deleted_count !== 1 ? 's' : ''} permanently removed.`, severity: 'info', timestamp: new Date().toISOString() });
                 } else {
                     let errorDetail = 'Unknown error';
                     try {
@@ -4648,6 +4823,7 @@ outline-offset: 2px;
                     const statusEl = document.getElementById("user-management-status");
                     setUserManagementStatus(`Invitation sent successfully to ${email}`, "success");
                     setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 5000);
+                    addNotification({ event: 'user_invited', title: 'Invitation Sent', message: `Invite sent to ${email} as ${role}.`, severity: 'info', timestamp: new Date().toISOString() });
                     succeeded = true;
                 } else {
                     const data = await resp.json().catch(() => ({}));
@@ -4754,6 +4930,7 @@ outline-offset: 2px;
                 }
                 const name = systemUsersState.find(u => u.id === userId)?.name || 'User';
                 showAppMessage(`${name} has been ${activate ? 'reactivated' : 'deactivated'}.`);
+                addNotification({ event: 'user_status_changed', title: activate ? 'User Reactivated' : 'User Deactivated', message: `${name} account ${activate ? 'reactivated' : 'deactivated'}.`, severity: 'info', timestamp: new Date().toISOString() });
             } catch (_) {
                 setUserManagementStatus('Action failed. Check your connection.', 'error');
             }
@@ -4906,6 +5083,7 @@ outline-offset: 2px;
                     status.classList.add("text-emerald-600");
                     showAppMessage(status.textContent);
                     renderDashboard();
+                    addNotification({ event: 'settings_saved', title: 'Settings Saved', message: `Detection thresholds updated (phishing: ${settings.phishingThreshold}/100).`, severity: 'success', timestamp: new Date().toISOString() });
                 } else {
                     const data = await resp.json().catch(() => ({}));
                     status.textContent = data.message || "Save failed. Check threshold values.";
@@ -5170,6 +5348,9 @@ outline-offset: 2px;
 
             if (sessionRestored) {
                 // Valid session — go straight to the dashboard.
+                window._notifications = [];
+                window._unreadCount   = 0;
+                updateNotificationBadge();
                 startTokenRefreshTimer();
                 startInactivityTracking();
                 connectSSE();
