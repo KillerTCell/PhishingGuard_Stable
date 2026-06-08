@@ -59,6 +59,11 @@ RULE_TEXT_TEMPLATES: dict[str, str] = {
         "This email contains URLs that have been reported as phishing sites "
         "in public threat intelligence databases."
     ),
+    "grammar_quality": (
+        "This email contains an unusually high number of spelling errors and "
+        "grammatical mistakes, a common characteristic of phishing emails that "
+        "are often composed quickly or translated from another language."
+    ),
     "default": (
         "This email exhibits multiple characteristics commonly associated with "
         "phishing attempts. Exercise caution before clicking any links or "
