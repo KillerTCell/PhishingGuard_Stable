@@ -1,7 +1,9 @@
 {
-  "f1": 1.0,
-  "precision": 1.0,
-  "recall": 1.0,
-  "model_version": "rf_v1.0.0",
-  "trained_at": "2026-06-08T01:35:16.053557+00:00"
+  "f1": 0.6479,
+  "precision": 0.0,
+  "recall": 0.0,
+  "model_version": "rf_v1.0.1",
+  "trained_at": "2026-06-10T01:14:10.981548+00:00",
+  "sample_count": 17967,
+  "f1_before": 1.0
 }
