@@ -1,5 +1,5 @@
 # ── Claude Code (machine-specific, never commit) ─────────────
-.claude/settings.local.json
+.claude/
 
 # ── Secrets ──────────────────────────────────────────────────
 backend/.env
@@ -12,6 +12,12 @@ backend/nginx/ssl/*.crt
 backend/nginx/ssl/*.key
 backend/nginx/ssl/*.p12
 # generate-dev-cert.sh is tracked — only the actual cert files are excluded
+
+# ── Database Backups (local SQL dumps — may contain real user data) ──
+backend/backups/
+
+# ── ML Training Corpus (large raw data — not needed to run the app) ──
+spamassasin_corpus/
 
 # ── ML Artefacts ─────────────────────────────────────────────
 # model.pkl and metrics.json ARE committed (build artefacts).
