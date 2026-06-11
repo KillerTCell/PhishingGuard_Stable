@@ -2990,35 +2990,35 @@ outline-offset: 2px;
         // the 0–100 score — only the display layer uses bands.
 
         function getRiskBand(score) {
-            if (score <= 19) return {
-                label: 'Safe', color: '#16A34A', bg: '#F0FDF4',
-                border: '#86EFAC', icon: '✓',
-                action: 'No action required',
-                cta: null, ctaClass: null
+            if (score <= 20) return {
+                label: 'Safe', action: 'No action needed', emoji: '✅',
+                color: '#16A34A', border: '#86EFAC', bg: '#F0FDF4',
+                textColor: '#15803D',
+                icon: '✅', cta: null, ctaClass: null
             };
-            if (score <= 44) return {
-                label: 'Low Risk', color: '#65A30D', bg: '#F7FEE7',
-                border: '#BEF264', icon: 'ℹ',
-                action: 'Monitor — unlikely phishing',
-                cta: 'Mark as reviewed', ctaClass: 'cta-low'
+            if (score <= 40) return {
+                label: 'Low Risk', action: 'Monitor — unlikely phishing', emoji: 'ℹ️',
+                color: '#65A30D', border: '#BEF264', bg: '#F7FEE7',
+                textColor: '#4D7C0F',
+                icon: 'ℹ️', cta: 'Mark as reviewed', ctaClass: 'cta-low'
             };
-            if (score <= 64) return {
-                label: 'Suspicious', color: '#D97706', bg: '#FFFBEB',
-                border: '#FDE68A', icon: '⚠',
-                action: 'Needs investigation — do not click links',
-                cta: 'Flag for review', ctaClass: 'cta-suspicious'
+            if (score <= 60) return {
+                label: 'Moderate Risk', action: 'Review carefully before acting', emoji: '⚠️',
+                color: '#D97706', border: '#FDE68A', bg: '#FFFBEB',
+                textColor: '#B45309',
+                icon: '⚠️', cta: 'Flag for review', ctaClass: 'cta-suspicious'
             };
-            if (score <= 84) return {
-                label: 'High Risk', color: '#DC2626', bg: '#FEF2F2',
-                border: '#FECACA', icon: '✕',
-                action: 'Likely phishing — quarantine recommended',
-                cta: 'Confirm phishing', ctaClass: 'cta-high'
+            if (score <= 80) return {
+                label: 'High Risk', action: 'Do not click links — likely phishing', emoji: '🚨',
+                color: '#DC2626', border: '#FECACA', bg: '#FEF2F2',
+                textColor: '#B91C1C',
+                icon: '🚨', cta: 'Confirm phishing', ctaClass: 'cta-high'
             };
             return {
-                label: 'Critical Threat', color: '#7C3AED', bg: '#F5F3FF',
-                border: '#C4B5FD', icon: '☠',
-                action: 'Critical — auto-quarantined',
-                cta: 'Confirm & report', ctaClass: 'cta-critical'
+                label: 'Critical', action: 'Report and delete immediately', emoji: '☠️',
+                color: '#7C3AED', border: '#C4B5FD', bg: '#F5F3FF',
+                textColor: '#6D28D9',
+                icon: '☠️', cta: 'Confirm & report', ctaClass: 'cta-critical'
             };
         }
 
