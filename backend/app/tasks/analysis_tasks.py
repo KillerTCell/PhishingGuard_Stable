@@ -898,6 +898,7 @@ def generate_explanation(self: Any, email_id: str) -> str:
     email_uuid = uuid.UUID(email_id)
     session = _make_sync_session()
     top_features: list[Any] = []
+    ml_score: int = 0
 
     try:
         analysis = session.execute(
@@ -909,21 +910,53 @@ def generate_explanation(self: Any, email_id: str) -> str:
             return email_id
 
         top_features = analysis.top_features or []
+        ml_score = analysis.risk_score or 0
 
         email = session.execute(
             _select(Email).where(Email.id == email_uuid)
         ).scalar_one_or_none()
-        sender = (email.sender or "") if email else ""
-        subject = (email.subject or "") if email else ""
+        if email is None:
+            log.warning("generate_explanation_no_email", email_id=email_id)
+            return email_id
 
-        explanation = _asyncio.run(
-            claude_service.generate_explanation(top_features, sender, subject)
+        hybrid_result = _asyncio.run(
+            claude_service.generate_explanation(
+                top_features=top_features,
+                sender=email.sender or "",
+                subject=email.subject or "",
+                body_text=email.body_text or "",
+                ml_score=ml_score,
+                spf=email.spf or "none",
+                dkim=email.dkim or "none",
+                dmarc=email.dmarc or "none",
+            )
         )
+
+        final_score = hybrid_result["final_score"]
+        update_values: dict[str, Any] = {
+            "explanation": hybrid_result["explanation"],
+            "detection_confidence": hybrid_result["confidence"],
+        }
+
+        if final_score != ml_score:
+            update_values["risk_score"] = final_score
+            from app.models.organisation import Organisation  # noqa: PLC0415
+            org = session.execute(
+                _select(Organisation).where(Organisation.id == email.org_id)
+            ).scalar_one_or_none()
+            phish_t = org.phishing_threshold if org else 60
+            susp_t = org.suspicious_threshold if org else 30
+            if final_score >= phish_t:
+                update_values["classification"] = "phishing"
+            elif final_score >= susp_t:
+                update_values["classification"] = "suspicious"
+            else:
+                update_values["classification"] = "safe"
 
         session.execute(
             _update(AnalysisResult.__table__)
             .where(AnalysisResult.__table__.c.email_id == email_uuid)
-            .values(explanation=explanation)
+            .values(**update_values)
         )
         session.commit()
         log.info("generate_explanation_done", email_id=email_id)
@@ -941,10 +974,7 @@ def generate_explanation(self: Any, email_id: str) -> str:
             raise self.retry(exc=exc, countdown=10)
         except MaxRetriesExceededError:
             # Non-critical — write rule-text fallback and continue the chain.
-            key = top_features[0].get("name", "default") if top_features else "default"
-            fallback = claude_service.RULE_TEXT_TEMPLATES.get(
-                key, claude_service.RULE_TEXT_TEMPLATES["default"]
-            )
+            fallback = claude_service._fallback_explanation(top_features, ml_score)
             fallback_session = _make_sync_session()
             try:
                 from sqlalchemy import update as _upd  # noqa: PLC0415
@@ -952,13 +982,15 @@ def generate_explanation(self: Any, email_id: str) -> str:
                 fallback_session.execute(
                     _upd(AnalysisResult.__table__)
                     .where(AnalysisResult.__table__.c.email_id == email_uuid)
-                    .values(explanation=fallback)
+                    .values(
+                        explanation=fallback["explanation"],
+                        detection_confidence=fallback["confidence"],
+                    )
                 )
                 fallback_session.commit()
                 log.info(
                     "generate_explanation_fallback_written",
                     email_id=email_id,
-                    key=key,
                 )
             except Exception as fb_exc:
                 log.error(

@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     SmallInteger,
     String,
     Text,
@@ -90,6 +91,11 @@ class AnalysisResult(Base):  # type: ignore[misc]  # SQLAlchemy declarative_base
     )
     quarantined: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
+    )
+    # Unified detection confidence 0-100. Internal only — never labelled as
+    # "claude confidence" or "ml confidence" on any user-facing surface.
+    detection_confidence: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

@@ -1039,7 +1039,6 @@ outline-offset: 2px;
                             <button type="button" id="email-detail-back" onclick="goBackToEmailList()" class="text-slate-500 hover:text-slate-800 flex items-center transition-colors px-2 py-1 -ml-2">
                                 <iconify-icon icon="solar:arrow-left-linear" class="mr-1.5 text-lg" stroke-width="1.5"></iconify-icon> Back to All Emails
                             </button>
-                            <span class="text-xs text-slate-400">Risk assessed using stored evidence only.</span>
                         </div>
                         
                         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1124,10 +1123,11 @@ outline-offset: 2px;
                                         <h3 class="text-sm font-medium uppercase tracking-wider mb-2" style="color:rgba(255,255,255,0.8)">Risk Assessment</h3>
                                         <div id="detail-band-icon" style="font-size:32px;line-height:1;margin-bottom:6px" aria-hidden="true">🛡</div>
                                         <div id="detail-band-label" class="text-3xl font-bold tracking-tight">Loading</div>
+                                        <p id="detail-confidence" class="text-sm mt-1 font-medium" style="color:rgba(255,255,255,0.9);display:none"></p>
                                         <p id="detail-band-action" class="mt-2 text-sm font-medium" style="color:rgba(255,255,255,0.92)"></p>
                                     </div>
                                     <div class="p-6">
-                                        <h4 class="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-3">Model Explanation</h4>
+                                        <h4 class="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-3">Why this was flagged</h4>
                                         <div id="detail-plain-explanation" class="mb-4"></div>
                                         <ul id="detail-explanations" class="space-y-3 text-sm text-slate-600"></ul>
                                     </div>
@@ -2343,7 +2343,7 @@ outline-offset: 2px;
                     addNotification({
                         event:     'scan_complete',
                         title:     'Email Analysis Complete',
-                        message:   `${data.sender || 'Email'} — ${data.classification || 'processed'} (${getRiskBand(data.risk_score ?? 0).label})`,
+                        message:   `${data.sender || 'Email'} — ${getRiskBand(data.risk_score ?? 0).label}`,
                         severity:  data.classification === 'phishing' ? 'danger'
                                  : data.classification === 'suspicious' ? 'warning' : 'success',
                         timestamp: new Date().toISOString(),
@@ -3640,7 +3640,7 @@ outline-offset: 2px;
                 if (!resp || !resp.ok) throw new Error('API error');
                 removeQuarantineRow(emailId);
                 _updateQuarantineCount(-1);
-                showAppMessage('Confirmed as phishing — saved for ML training.');
+                showAppMessage('Confirmed as phishing. Thank you for your feedback.');
             } catch (_) { showAppMessage('Could not confirm phishing. Please try again.'); }
         }
 
@@ -3691,8 +3691,8 @@ outline-offset: 2px;
                 if (!resp || !resp.ok) throw new Error('Failed');
                 removeQuarantineRow(emailId);
                 _updateQuarantineCount(-1);
-                showAppMessage('Confirmed as phishing — saved for ML training.');
-                addNotification({ event: 'email_actioned', title: 'Email Confirmed', message: 'Email confirmed as phishing and saved for ML training.', severity: 'danger', timestamp: new Date().toISOString() });
+                showAppMessage('Confirmed as phishing. Thank you for your feedback.');
+                addNotification({ event: 'email_actioned', title: 'Email Confirmed', message: 'Email confirmed as phishing — feedback recorded.', severity: 'danger', timestamp: new Date().toISOString() });
             } catch (_) { showAppMessage('Failed to confirm. Please try again.'); }
         }
 
@@ -4330,6 +4330,15 @@ outline-offset: 2px;
             setText("detail-band-icon",  band.icon);
             setText("detail-band-label", band.label);
             setText("detail-band-action", band.action);
+            const confEl = document.getElementById("detail-confidence");
+            if (confEl) {
+                if (email.detection_confidence != null) {
+                    confEl.textContent = `${email.detection_confidence}% confident`;
+                    confEl.style.display = '';
+                } else {
+                    confEl.style.display = 'none';
+                }
+            }
 
             // Plain-English explanation
             const scoreForColor = email.risk_score ?? 0;
@@ -4763,6 +4772,7 @@ outline-offset: 2px;
                     <div style="width:38px;height:38px;background:white;border:1px solid ${band.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:${band.color};flex-shrink:0" aria-hidden="true">${band.icon}</div>
                     <div style="flex:1;min-width:0">
                         <h4 style="font-size:16px;font-weight:700;color:${band.color};margin:0">${band.label}</h4>
+                        ${result.detection_confidence != null ? `<p style="font-size:12px;font-weight:600;color:#6B7280;margin:2px 0 4px">${result.detection_confidence}% confident</p>` : ''}
                         <p style="font-size:13px;font-weight:500;color:#374151;margin:6px 0 4px">${band.action}</p>
                         ${result.explanation ? `<p style="font-size:12px;color:#6B7280;margin:0;line-height:1.5">${escapeHtml(result.explanation)}</p>` : ''}
                         ${ctaBtn}

@@ -119,76 +119,199 @@ LOCAL_ANSWER_MAP: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
-# generate_explanation
+# Hybrid scoring engine — internal only, never referenced in API responses
 # ---------------------------------------------------------------------------
 
 
-async def generate_explanation(
-    top_features: list[dict[str, Any]],
+async def _call_claude_hybrid(
     sender: str,
     subject: str,
-) -> str:
-    """Call the Claude API to produce a 2-3 sentence plain-English explanation.
+    body_text: str,
+    spf: str,
+    dkim: str,
+    dmarc: str,
+    top_features: list,
+    ml_score: int,
+) -> dict | None:
+    """Internal hybrid engine. Calls Claude with full email context.
 
-    Falls back to :data:`RULE_TEXT_TEMPLATES` on any API error so the
-    explanation column is always populated even when the API is unavailable.
-
-    Uses the synchronous ``anthropic.Anthropic`` client wrapped in
-    ``asyncio.to_thread`` so the event loop is never blocked.
-
-    Args:
-        top_features: List of top-3 feature dicts
-            ``[{name, value, score_contribution}, ...]`` from AnalysisResult.
-        sender:  Email sender address (may be empty string).
-        subject: Email subject line (may be empty string).
-
-    Returns:
-        2-3 sentence plain-English explanation string.  Never raises.
+    Returns dict: final_score, explanation, confidence, verdict.
+    Returns None on any failure so the caller falls back to rule-text.
     """
-    system_prompt = (
-        "You are a cybersecurity assistant. Explain in 2-3 plain English "
-        "sentences (no jargon) why this email is suspicious. Be specific "
-        "about the signals found."
-    )
-    user_content = (
-        f"Sender: {sender}. "
-        f"Subject: {subject}. "
-        f"Top risk signals: {json.dumps(top_features)}"
-    )
+    feature_lines = []
+    for f in (top_features or []):
+        name = f.get("name", "")
+        val = float(f.get("value", 0) or 0)
+        if val > 0.1:
+            feature_lines.append(f"- {name}: {val:.2f}")
+    feature_text = "\n".join(feature_lines) or "- No strong signals"
 
-    def _sync_call() -> str:
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-        response = client.messages.create(
-            model=_CLAUDE_MODEL,
-            max_tokens=150,
-            timeout=5.0,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_content}],
-        )
-        block = response.content[0]
-        # Only TextBlock carries plain text; other block types are unexpected here.
-        if not isinstance(block, TextBlock):
-            return RULE_TEXT_TEMPLATES["default"]
-        return block.text.strip()
+    auth_parts = []
+    if spf and spf != "none":
+        auth_parts.append(f"SPF={spf}")
+    if dkim and dkim != "none":
+        auth_parts.append(f"DKIM={dkim}")
+    if dmarc and dmarc != "none":
+        auth_parts.append(f"DMARC={dmarc}")
+    auth_str = ", ".join(auth_parts) or "Not checked"
+
+    body_sample = (body_text or "").strip()[:600]
+
+    prompt = f"""You are an email security system analysing whether an email is phishing.
+
+EMAIL:
+  From: {sender or 'unknown'}
+  Subject: {subject or '(no subject)'}
+  Authentication: {auth_str}
+  Body: {body_sample}
+
+AUTOMATED SIGNALS DETECTED:
+{feature_text}
+  Initial automated score: {ml_score}/100
+
+Analyse this email for phishing risk. Consider:
+- Sender domain legitimacy (random strings, suspicious TLDs, typosquatting)
+- Whether the body content matches the claimed sender
+- Urgency, threats, or pressure tactics
+- Requests for credentials, personal data, or money
+- Link deception, spoofed branding, or impersonation
+- Authentication failures indicating spoofed sender
+- Overall intent — is this deceptive?
+
+Respond ONLY with this exact JSON (no other text):
+{{
+  "verdict": "safe" | "suspicious" | "phishing",
+  "confidence": <integer 0-100>,
+  "score": <integer 0-100>,
+  "explanation": "<2-4 plain English sentences. Write for a non-technical person. Do NOT mention AI, machine learning, models, or algorithms. Explain what specific things about this email are suspicious or safe. Be direct and clear.>"
+}}
+
+SCORING GUIDE:
+  0-19: Safe — clearly legitimate
+  20-44: Low Risk — minor concerns
+  45-64: Suspicious — needs review
+  65-84: High Risk — likely phishing
+  85-100: Critical — almost certainly phishing
+
+If automated score and your analysis significantly disagree,
+trust your analysis of the actual email content."""
 
     try:
-        return await asyncio.to_thread(_sync_call)
-    except (anthropic.APIError, anthropic.RateLimitError, httpx.TimeoutException) as exc:
-        log.warning(
-            "generate_explanation_api_error",
-            exc_type=type(exc).__name__,
-            error=str(exc),
-        )
-    except Exception as exc:
-        log.warning(
-            "generate_explanation_unexpected_error",
-            exc_type=type(exc).__name__,
-            error=str(exc),
-        )
+        import re as _re  # noqa: PLC0415
 
-    # Fallback: use the rule-text for the top feature (or default)
-    key = top_features[0].get("name", "default") if top_features else "default"
-    return RULE_TEXT_TEMPLATES.get(key, RULE_TEXT_TEMPLATES["default"])
+        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        response = await asyncio.wait_for(
+            client.messages.create(
+                model=_CLAUDE_MODEL,
+                max_tokens=350,
+                messages=[{"role": "user", "content": prompt}],
+            ),
+            timeout=12.0,
+        )
+        raw = response.content[0].text.strip()
+
+        json_match = _re.search(r"\{.*\}", raw, _re.DOTALL)
+        if not json_match:
+            raise ValueError(f"No JSON in response: {raw[:100]}")
+
+        data = json.loads(json_match.group())
+        verdict = data.get("verdict", "suspicious")
+        confidence = max(0, min(100, int(data.get("confidence", 50))))
+        claude_score = max(0, min(100, int(data.get("score", ml_score))))
+        explanation = data.get("explanation", "")
+
+        # Blend: Claude leads (65%), ML anchors (35%).
+        # Gap <20 pts → trust ML. Wider divergence → blend toward Claude.
+        gap = abs(claude_score - ml_score)
+        if gap < 20:
+            final_score = ml_score
+        elif claude_score > ml_score:
+            final_score = int(claude_score * 0.65 + ml_score * 0.35)
+        else:
+            blended = int(claude_score * 0.50 + ml_score * 0.50)
+            final_score = max(blended, ml_score - 20)
+
+        final_score = max(0, min(100, final_score))
+
+        log.info(
+            "hybrid_scoring",
+            ml_score=ml_score,
+            claude_score=claude_score,
+            final_score=final_score,
+            verdict=verdict,
+            confidence=confidence,
+        )
+        return {
+            "final_score": final_score,
+            "explanation": explanation,
+            "confidence": confidence,
+            "verdict": verdict,
+        }
+
+    except Exception as exc:
+        log.warning("hybrid_claude_failed", error=str(exc))
+        return None
+
+
+def _fallback_explanation(top_features: list, ml_score: int) -> dict:
+    """Rule-based fallback when Claude API is unavailable.
+
+    Returns plain-English explanation without mentioning technology.
+    """
+    top_name = (
+        top_features[0].get("name", "default") if top_features else "default"
+    )
+    explanation = RULE_TEXT_TEMPLATES.get(top_name, RULE_TEXT_TEMPLATES["default"])
+    verdict = (
+        "phishing" if ml_score >= 60
+        else "suspicious" if ml_score >= 30
+        else "safe"
+    )
+    if ml_score >= 80:
+        confidence = 85 + (ml_score - 80) // 4
+    elif ml_score >= 60:
+        confidence = 70 + (ml_score - 60) // 2
+    elif ml_score >= 30:
+        confidence = 50 + ml_score // 3
+    else:
+        confidence = 40 + ml_score
+    confidence = max(0, min(100, confidence))
+    return {
+        "final_score": ml_score,
+        "explanation": explanation,
+        "confidence": confidence,
+        "verdict": verdict,
+    }
+
+
+# Public interface — only function called externally
+async def generate_explanation(
+    top_features: list,
+    sender: str,
+    subject: str,
+    body_text: str = "",
+    ml_score: int = 0,
+    spf: str = "none",
+    dkim: str = "none",
+    dmarc: str = "none",
+) -> dict:
+    """Unified public interface for the hybrid scoring engine.
+
+    Returns dict: final_score, explanation, confidence, verdict. Never raises.
+    """
+    result = await _call_claude_hybrid(
+        sender=sender,
+        subject=subject,
+        body_text=body_text,
+        spf=spf,
+        dkim=dkim,
+        dmarc=dmarc,
+        top_features=top_features,
+        ml_score=ml_score,
+    )
+    if result is None:
+        result = _fallback_explanation(top_features, ml_score)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -257,13 +380,15 @@ async def chat_stream(
     )
 
     system_prompt = (
-        "You are PhishGuard's AI security assistant. Answer concisely and helpfully.\n"
+        "You are PhishGuard's security assistant. Answer concisely and helpfully.\n"
+        "Never mention that you are Claude, never mention Anthropic, never mention "
+        "AI or machine learning models. You are the PhishGuard security assistant. "
+        "Refer to yourself as 'PhishGuard' or 'the security system'.\n"
         "Organisation context (use this to personalise your answers):\n"
         f"  Suspicious threshold : {suspicious}/100\n"
         f"  Phishing threshold   : {phishing}/100\n"
         f"  Emails analysed      : {total_analysed}\n"
         f"  Currently quarantined: {quarantine_count}\n"
-        f"  ML model version     : {model_version}\n"
         f"  Top detection signals: {top_drivers_str}"
     )
 

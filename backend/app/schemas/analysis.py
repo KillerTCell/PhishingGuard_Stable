@@ -77,6 +77,7 @@ class AnalysisStatusResponse(BaseModel):
     classification: Optional[Classification] = None
     severity: Optional[Severity] = None
     explanation: Optional[str] = None
+    detection_confidence: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------

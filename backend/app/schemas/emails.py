@@ -196,6 +196,7 @@ class EmailDetail(BaseModel):
     explanation: Optional[str] = None
     top_features: list[EmailFeatureDetail] = Field(default_factory=list)
     model_version: Optional[str] = None
+    detection_confidence: Optional[int] = None
 
     # Lifecycle flags
     quarantined: bool = False
