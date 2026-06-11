@@ -3432,8 +3432,8 @@ outline-offset: 2px;
 
             tbody.innerHTML = items.map(email => {
                 const safeId      = escapeHtml(email.id);
-                const safeSender  = JSON.stringify(email.sender  || '');
-                const safeSubject = JSON.stringify(email.subject || '');
+                const safeSender  = JSON.stringify(email.sender  || '').replace(/"/g, '&quot;');
+                const safeSubject = JSON.stringify(email.subject || '').replace(/"/g, '&quot;');
                 const fbBadge = email.feedback_state
                     ? `<span class="q-feedback-badge ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-100">${escapeHtml(capitalize(email.feedback_state))}</span>`
                     : '';
@@ -3937,8 +3937,8 @@ outline-offset: 2px;
                     const lbl         = statusLabel(email.status);
                     const score       = email.risk_score ?? 0;
                     const isDelivered = email.status === "delivered";
-                    const safeSender  = JSON.stringify(email.sender  || '');
-                    const safeSubject = JSON.stringify(email.subject || '');
+                    const safeSender  = JSON.stringify(email.sender  || '').replace(/"/g, '&quot;');
+                    const safeSubject = JSON.stringify(email.subject || '').replace(/"/g, '&quot;');
                     const cbCell = isAdmin
                         ? `<td style="width:44px;padding:12px 8px 12px 16px" onclick="event.stopPropagation()">
                                <input type="checkbox" class="email-row-checkbox" data-id="${email.id}"
