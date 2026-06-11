@@ -423,6 +423,29 @@ def _extract_from_stdlib_message(message: Any) -> dict[str, Any]:
                 charset = part.get_content_charset() or "utf-8"
                 html_raw = _safe_decode(payload, charset)
 
+    # HTML fallback: if text/plain is absent or very short, extract text
+    # from the HTML part so NLP features score correctly on HTML-only emails.
+    if len((body_text or "").strip()) < 30 and html_raw:
+        _clean = re.sub(
+            r"<style[^>]*>.*?</style>", "", html_raw,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        _clean = re.sub(
+            r"<script[^>]*>.*?</script>", "", _clean,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        _clean = re.sub(r"<[^>]+>", " ", _clean)
+        _clean = (
+            _clean.replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&#39;", "'")
+        )
+        _clean = re.sub(r"\s+", " ", _clean).strip()
+        if len(_clean) > len((body_text or "").strip()):
+            body_text = _clean
+
     return {
         "sender": _decode_header_value(message.get("From")),
         "reply_to": _decode_header_value(message.get("Reply-To")),

@@ -160,6 +160,37 @@ def classify(feature_vector: list[float]) -> dict[str, Any]:
     if known_bad >= 1.0:
         risk_score = max(risk_score, 80)
 
+    # ── Body-signal overrides (auth_failure NOT required) ──────────
+    # These catch real phishing emails that pass SPF/DKIM/DMARC
+    # but have strong phishing body content (e.g. phishing_pot corpus)
+
+    # Rule: Urgency + credential request alone = at minimum suspicious
+    # Covers "verify your account immediately" style phishing
+    if urgency >= 0.6 and credential >= 0.6:
+        risk_score = max(risk_score, 50)
+
+    # Rule: Urgency + impersonation + credential = high risk
+    # Covers PayPal/bank/Microsoft impersonation phishing
+    if urgency >= 0.5 and impersonation >= 0.5 and credential >= 0.4:
+        risk_score = max(risk_score, 63)
+
+    # Rule: All three body signals strong = high risk
+    # The clearest phishing pattern: urgent, impersonating, wants creds
+    if urgency >= 0.7 and credential >= 0.5 and impersonation >= 0.6:
+        risk_score = max(risk_score, 70)
+
+    # Rule: Link mismatch + impersonation = suspicious minimum
+    # Displayed link says PayPal but goes to paypa1-secure.net
+    if link_mismatch >= 0.5 and impersonation >= 0.5:
+        risk_score = max(risk_score, 52)
+
+    # Rule: Link mismatch + credential + urgency = high risk
+    # Classic click-here-to-verify with deceptive URL
+    if link_mismatch >= 0.5 and credential >= 0.5 and urgency >= 0.4:
+        risk_score = max(risk_score, 65)
+
+    # ── End body-signal overrides ───────────────────────────────────
+
     risk_score = min(risk_score, 100)
 
     severity = score_to_severity(risk_score).value
