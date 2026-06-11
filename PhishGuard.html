@@ -3569,21 +3569,7 @@ outline-offset: 2px;
                         ${escapeHtml(formatReceived(email.received_at))}
                     </td>
                     <td class="px-5 py-4">
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                            <button onclick="event.stopPropagation();confirmPhishing('${safeId}')"
-                                title="Confirm this is a phishing email"
-                                style="padding:5px 10px;background:transparent;color:#DC2626;border:1px solid #FECACA;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:background 0.15s"
-                                onmouseover="this.style.background='#FEF2F2'" onmouseout="this.style.background='transparent'">✕ Phishing</button>
-                            <button onclick="event.stopPropagation();markInvestigation('${safeId}')"
-                                title="Flag for further investigation"
-                                style="padding:5px 10px;background:transparent;color:#D97706;border:1px solid #FDE68A;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:background 0.15s"
-                                onmouseover="this.style.background='#FFFBEB'" onmouseout="this.style.background='transparent'">? Unsure</button>
-                            <button onclick="event.stopPropagation();releaseEmail('${safeId}')"
-                                title="Release as safe email"
-                                style="padding:5px 10px;background:transparent;color:#16A34A;border:1px solid #86EFAC;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:background 0.15s"
-                                onmouseover="this.style.background='#F0FDF4'" onmouseout="this.style.background='transparent'">✓ Safe</button>
-                            ${trashBtn}
-                        </div>
+                        <span onclick="openEmailDetail('${safeId}')" style="color:#6366F1;font-size:13px;font-weight:500;cursor:pointer">Review</span>
                     </td>
                 </tr>`;
             }).join('');
