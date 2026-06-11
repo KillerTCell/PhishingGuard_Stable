@@ -692,18 +692,44 @@ async def forgot_password(
         db.add(reset)
 
         reset_link = (
-            f"{_frontend_url()}/auth/reset-password?token={raw_token}"
+            f"{_frontend_url()}/PhishGuard.html?reset={raw_token}"
         )
         await _send_email(
             to=user.email,
             subject="Reset your PhishGuard password",
-            html=(
-                f"<p>Hi {user.full_name},</p>"
-                f"<p>Click the link below to reset your password. "
-                f"This link expires in {_RESET_TOKEN_TTL_HOURS} hour(s).</p>"
-                f"<p><a href='{reset_link}'>Reset password</a></p>"
-                f"<p>If you did not request a password reset, ignore this email.</p>"
-            ),
+            html=f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F8FAFC;margin:0;padding:40px 20px;">
+  <div style="max-width:560px;margin:0 auto">
+    <div style="text-align:center;margin-bottom:32px">
+      <h1 style="font-size:24px;font-weight:700;color:#4F46E5;margin:0">PhishGuard</h1>
+      <p style="font-size:13px;color:#9CA3AF;margin:6px 0 0">Email Security Platform</p>
+    </div>
+    <div style="background:#ffffff;border-radius:14px;border:1px solid #E5E7EB;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="width:52px;height:52px;border-radius:50%;background:#EEF2FF;display:inline-flex;align-items:center;justify-content:center;font-size:24px;">🔒</div>
+      </div>
+      <h2 style="font-size:20px;font-weight:600;color:#111827;margin:0 0 8px;text-align:center">Reset your password</h2>
+      <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 8px;text-align:center">Hi {user.full_name},</p>
+      <p style="font-size:14px;color:#6B7280;line-height:1.6;margin:0 0 28px;text-align:center">We received a request to reset your PhishGuard password. Click the button below to choose a new one. This link expires in <strong>1 hour</strong>.</p>
+      <div style="text-align:center;margin-bottom:28px">
+        <a href="{reset_link}" style="display:inline-block;background:#4F46E5;color:#ffffff;text-decoration:none;padding:13px 32px;border-radius:8px;font-size:15px;font-weight:600;letter-spacing:0.01em;">Reset my password →</a>
+      </div>
+      <div style="background:#F9FAFB;border-radius:8px;border:1px solid #E5E7EB;padding:14px 16px;">
+        <p style="font-size:12px;color:#6B7280;line-height:1.6;margin:0">🔐 <strong>Didn't request this?</strong> If you didn't ask to reset your password, you can safely ignore this email. Your password will remain unchanged.</p>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:24px;padding:0 16px">
+      <p style="font-size:12px;color:#9CA3AF;line-height:1.6;margin:0">This link expires in 1 hour and can only be used once.</p>
+      <p style="font-size:12px;color:#D1D5DB;margin:12px 0 0">— PhishGuard</p>
+    </div>
+  </div>
+</body>
+</html>""",
         )
         log.info("password_reset_token_created", user_id=str(user.id))
 
@@ -798,18 +824,42 @@ async def create_invite(
     await db.flush()
     await db.refresh(invite)
 
-    invite_link = f"http://localhost:3000/PhishGuard.html?invite={raw_token}"
+    invite_link = f"{_frontend_url()}/PhishGuard.html?invite={raw_token}"
+    _role_display = {"admin": "Owner", "analyst": "Contributor"}.get(
+        body.role.value, body.role.value.capitalize()
+    )
+    inviter_name = current_user.full_name
     await _send_email(
         to=body.email,
-        subject=f"You've been invited to join {current_user.full_name}'s PhishGuard organisation",
-        html=(
-            f"<p>Hi,</p>"
-            f"<p>You have been invited to join a PhishGuard organisation as "
-            f"<strong>{body.role.value}</strong>.</p>"
-            f"<p>Click the link below to create your account. "
-            f"This invitation expires in {_INVITE_TTL_HOURS} hours.</p>"
-            f"<p><a href='{invite_link}'>Accept invitation</a></p>"
-        ),
+        subject="You've been invited to join PhishGuard",
+        html=f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F8FAFC;margin:0;padding:40px 20px;">
+  <div style="max-width:560px;margin:0 auto">
+    <div style="text-align:center;margin-bottom:32px">
+      <h1 style="font-size:24px;font-weight:700;color:#4F46E5;margin:0">PhishGuard</h1>
+      <p style="font-size:13px;color:#9CA3AF;margin:6px 0 0">Email Security Platform</p>
+    </div>
+    <div style="background:#ffffff;border-radius:14px;border:1px solid #E5E7EB;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="width:52px;height:52px;border-radius:50%;background:#EEF2FF;display:inline-flex;align-items:center;justify-content:center;font-size:24px;">🛡️</div>
+      </div>
+      <h2 style="font-size:20px;font-weight:600;color:#111827;margin:0 0 16px;text-align:center">You've been invited to PhishGuard</h2>
+      <p style="font-size:14px;color:#6B7280;line-height:1.6;margin:0 0 24px;text-align:center"><strong>{inviter_name}</strong> has invited you to join their PhishGuard workspace as a <strong>{_role_display}</strong>. Click below to set up your account.</p>
+      <div style="text-align:center;margin-bottom:28px">
+        <a href="{invite_link}" style="display:inline-block;background:#4F46E5;color:#ffffff;text-decoration:none;padding:13px 32px;border-radius:8px;font-size:15px;font-weight:600;">Accept invitation →</a>
+      </div>
+      <div style="background:#F9FAFB;border-radius:8px;border:1px solid #E5E7EB;padding:14px 16px;">
+        <p style="font-size:12px;color:#6B7280;line-height:1.6;margin:0">⏰ This invitation expires in <strong>48 hours</strong>. If you didn't expect this invitation, you can safely ignore this email.</p>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:24px">
+      <p style="font-size:12px;color:#D1D5DB;margin:0">— PhishGuard</p>
+    </div>
+  </div>
+</body>
+</html>""",
     )
 
     await audit_service.write_audit_log(

@@ -281,6 +281,44 @@ outline-offset: 2px;
             </div>
 
             <!-- ═══════════════════════════════════════
+                 RESET PASSWORD FORM  (?reset=<token>)
+                 ─────────────────────────────────────── -->
+            <div id="section-reset" class="hidden">
+                <div class="flex items-start gap-3 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-5">
+                    <iconify-icon icon="solar:lock-keyhole-linear" class="text-indigo-600 text-xl shrink-0 mt-0.5" aria-hidden="true"></iconify-icon>
+                    <p class="text-sm text-indigo-700 font-medium">Enter your new password below.</p>
+                </div>
+                <form id="reset-form" class="space-y-4" onsubmit="handleResetPassword(event)" novalidate>
+                    <div>
+                        <label for="reset-password" class="block text-xs font-medium text-slate-700 mb-1.5">New Password</label>
+                        <div class="relative">
+                            <iconify-icon icon="solar:lock-keyhole-linear" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none" aria-hidden="true"></iconify-icon>
+                            <input id="reset-password" name="password" type="password" autocomplete="new-password"
+                                placeholder="At least 8 characters"
+                                class="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 shadow-sm"
+                                aria-describedby="reset-error" aria-invalid="false" required minlength="8">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="reset-confirm" class="block text-xs font-medium text-slate-700 mb-1.5">Confirm New Password</label>
+                        <div class="relative">
+                            <iconify-icon icon="solar:lock-keyhole-linear" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none" aria-hidden="true"></iconify-icon>
+                            <input id="reset-confirm" name="confirm" type="password" autocomplete="new-password"
+                                placeholder="Repeat your new password"
+                                class="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 shadow-sm"
+                                aria-describedby="reset-error" aria-invalid="false" required>
+                        </div>
+                    </div>
+                    <p id="reset-error" class="hidden text-xs text-rose-600 font-medium" aria-live="polite"></p>
+                    <button id="reset-btn" type="submit"
+                        class="w-full flex items-center justify-center bg-slate-900 text-white font-medium text-sm py-2.5 rounded-xl shadow-sm hover:bg-slate-800 transition-colors mt-2 h-11">
+                        Set New Password
+                        <iconify-icon icon="solar:arrow-right-linear" class="ml-2 text-base" stroke-width="1.5" aria-hidden="true"></iconify-icon>
+                    </button>
+                </form>
+            </div>
+
+            <!-- ═══════════════════════════════════════
                  ACCEPT INVITE FORM
                  ─────────────────────────────────────── -->
             <div id="section-invite" class="hidden">
@@ -2869,11 +2907,13 @@ outline-offset: 2px;
             document.getElementById("section-login").classList.add("hidden");
             document.getElementById("section-signup").classList.add("hidden");
             document.getElementById("section-forgot").classList.add("hidden");
+            document.getElementById("section-reset").classList.add("hidden");
             document.getElementById("section-invite").classList.add("hidden");
             clearAuthMessage();
             clearFormError("login-error");
             clearFormError("signup-error");
             clearFormError("forgot-error");
+            clearFormError("reset-error");
             clearFormError("invite-accept-error");
 
             const heading    = document.getElementById("auth-heading");
@@ -2894,6 +2934,11 @@ outline-offset: 2px;
                 heading.textContent    = "Reset your password";
                 subheading.textContent = "Enter your email and we'll send password reset instructions.";
                 document.getElementById("forgot-email")?.focus();
+            } else if (mode === "resetPassword") {
+                document.getElementById("section-reset").classList.remove("hidden");
+                heading.textContent    = "Set a new password";
+                subheading.textContent = "Choose a strong password for your account.";
+                document.getElementById("reset-password")?.focus();
             } else if (mode === "invite") {
                 document.getElementById("section-invite").classList.remove("hidden");
                 heading.textContent    = "Create your account";
@@ -3269,6 +3314,69 @@ outline-offset: 2px;
             );
         }
 
+        // ─── Reset Password (from ?reset= link) ──────────────────────
+
+        async function handleResetPassword(event) {
+            event.preventDefault();
+            clearFormError("reset-error");
+
+            const pwInput  = document.getElementById("reset-password");
+            const cfInput  = document.getElementById("reset-confirm");
+            const password = pwInput.value;
+            const confirm  = cfInput.value;
+
+            if (password.length < 8) {
+                showFormError("reset-error", "Password must be at least 8 characters.");
+                pwInput.focus();
+                return;
+            }
+            if (password !== confirm) {
+                showFormError("reset-error", "Passwords do not match.");
+                cfInput.focus();
+                return;
+            }
+
+            const token = window._pendingResetToken;
+            if (!token) {
+                showFormError("reset-error", "Reset token missing. Please use the link from your email.");
+                return;
+            }
+
+            const button       = document.getElementById("reset-btn");
+            const originalText = button.innerHTML;
+            button.disabled  = true;
+            button.innerHTML = '<iconify-icon icon="solar:spinner-linear" class="animate-spin text-lg" aria-hidden="true"></iconify-icon><span class="sr-only">Saving…</span>';
+
+            try {
+                const resp = await fetch(`${API_BASE}/auth/reset-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token, new_password: password }),
+                });
+
+                button.disabled  = false;
+                button.innerHTML = originalText;
+
+                if (resp.ok) {
+                    document.getElementById("reset-form").reset();
+                    window._pendingResetToken = null;
+                    showAuthMessage("Password updated. Redirecting to sign in…", "success");
+                    setTimeout(() => {
+                        history.replaceState(null, '', window.location.pathname);
+                        switchAuthMode("login");
+                    }, 2000);
+                } else {
+                    const data   = await resp.json().catch(() => ({}));
+                    const detail = data?.error?.message || data?.detail || "Reset failed. The link may have expired — request a new one.";
+                    showFormError("reset-error", typeof detail === "string" ? detail : "Reset failed. Please try again.");
+                }
+            } catch (_) {
+                button.disabled  = false;
+                button.innerHTML = originalText;
+                showFormError("reset-error", "Unable to reach the server. Check your connection.");
+            }
+        }
+
         // ─── Logout ───────────────────────────────────────────────────
 
         async function logout() {
@@ -3291,8 +3399,10 @@ outline-offset: 2px;
             document.getElementById("login-form")?.reset();
             document.getElementById("signup-form")?.reset();
             document.getElementById("forgot-form")?.reset();
+            document.getElementById("reset-form")?.reset();
             document.getElementById("invite-accept-form")?.reset();
             window._pendingInviteToken = null;
+            window._pendingResetToken  = null;
             switchAuthMode("login");
             setTimeout(() => {
                 login.classList.remove("opacity-0", "pointer-events-none");
@@ -6468,7 +6578,11 @@ outline-offset: 2px;
                 // Show the login screen.
                 const urlParams   = new URLSearchParams(window.location.search);
                 const inviteToken = urlParams.get('invite');
-                if (inviteToken) {
+                const resetToken  = urlParams.get('reset');
+                if (resetToken) {
+                    window._pendingResetToken = resetToken;
+                    switchAuthMode('resetPassword');
+                } else if (inviteToken) {
                     window._pendingInviteToken = inviteToken;
                     switchAuthMode('invite');
                     document.getElementById("invite-accept-name")?.focus();
