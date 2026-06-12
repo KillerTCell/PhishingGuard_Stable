@@ -6349,27 +6349,37 @@ outline-offset: 2px;
         }
 
         async function sendDigest() {
-            const status = document.getElementById("digest-status");
-            status.textContent = "Sending digest emails…";
-            status.classList.remove("hidden", "text-rose-600");
-            status.classList.add("text-emerald-600");
+            const statusEl = document.getElementById("digest-status");
+            const btn = document.querySelector('[onclick="sendDigest()"]');
+
+            statusEl.textContent = "Sending digest emails…";
+            statusEl.classList.remove("hidden", "text-rose-600");
+            statusEl.classList.add("text-emerald-600");
+            if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
 
             const targets = currentDigestItems.slice(0, 5);
             if (!targets.length) {
-                status.textContent = "No quarantined emails to send digests for.";
+                statusEl.textContent = "No quarantined emails to send digests for.";
+                if (btn) { btn.disabled = false; btn.textContent = "Prepare Digest"; }
                 return;
             }
 
-            let sent = 0;
+            let sent = 0, failed = 0;
             for (const item of targets) {
                 try {
                     const resp = await apiFetch(`/quarantine/${item.id}/send-digest`, { method: 'POST' });
-                    if (resp.ok) sent++;
-                } catch (_) {}
+                    if (resp.ok) sent++; else failed++;
+                } catch (_) { failed++; }
             }
 
-            const msg = sent > 0 ? `${sent} digest email${sent !== 1 ? 's' : ''} queued for delivery.` : "Digest send failed. Check recipient addresses.";
-            status.textContent = msg;
+            const ok = sent > 0;
+            const msg = ok
+                ? `${sent} digest email${sent !== 1 ? 's' : ''} queued for delivery.`
+                : "Digest send failed — check recipient addresses are set.";
+            statusEl.textContent = msg;
+            statusEl.classList.toggle("text-emerald-600", ok);
+            statusEl.classList.toggle("text-rose-600", !ok);
+            if (btn) { btn.disabled = false; btn.textContent = "Prepare Digest"; }
             showAppMessage(msg);
         }
 

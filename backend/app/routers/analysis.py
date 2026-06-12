@@ -373,7 +373,7 @@ async def get_analysis_stats(
         await db.execute(
             select(Email, AnalysisResult)
             .join(AnalysisResult, AnalysisResult.email_id == Email.id)
-            .where(Email.org_id == org_id, Email.status == "quarantined")
+            .where(Email.org_id == org_id, Email.status.in_(["quarantined", "confirmed_phishing"]))
             .order_by(Email.received_at.desc())
             .limit(5)
         )

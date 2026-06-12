@@ -594,7 +594,11 @@ async def send_digest(
         from app.tasks.digest_tasks import send_digest as send_digest_task  # noqa: PLC0415
 
         send_digest_task.delay(str(email_id), str(log_id))
-    except Exception:
-        logger.warning("digest_task_dispatch_failed", email_id=str(email_id))
+    except Exception as exc:
+        logger.warning("digest_task_dispatch_failed", email_id=str(email_id), error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Digest task could not be queued. Please retry.",
+        ) from exc
 
     return SendDigestResponse(digest_log_id=log_id)
